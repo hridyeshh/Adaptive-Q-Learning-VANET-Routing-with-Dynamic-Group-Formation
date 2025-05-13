@@ -160,7 +160,7 @@ Configure MQTT broker connection in the web interface:
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 📚 Publication
+## 📚 Based on
 
 This work is based on the research paper:
 > "Adaptive HQGR-Plus: A Hierarchical Reinforcement Learning Framework for Compute-Aware VANET Routing with Dynamic Group Formation"
