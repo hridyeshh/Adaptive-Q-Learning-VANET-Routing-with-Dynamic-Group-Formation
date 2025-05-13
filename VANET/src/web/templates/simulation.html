@@ -1,0 +1,464 @@
+{% extends "base.html" %}
+
+{% block title %}Simulation{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+<style>
+    /* Inline critical CSS for the map */
+    #map {
+        height: 600px !important;
+        width: 100% !important;
+        z-index: 1;
+    }
+    .leaflet-container {
+        height: 600px;
+        width: 100%;
+    }
+    /* Add better styling for metrics */
+    .metric-item {
+        border: 1px solid #ddd;
+        padding: 15px;
+        margin-bottom: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        background-color: white;
+    }
+    .connection-status {
+        margin-bottom: 15px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">VANET Simulation Dashboard</h2>
+
+<div class="connection-status">
+    <span id="connection-badge" class="badge bg-secondary">Disconnected</span>
+    <span id="simulation-status">Simulation not running</span>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Network Visualization</h5>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="show-coverage" checked>
+                    <label class="form-check-label" for="show-coverage">Show RSU Coverage</label>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <!-- The map div must have explicit height -->
+                <div id="map"></div>
+            </div>
+            <div class="card-footer">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <span class="badge bg-success me-2">Low Density</span>
+                        <span class="badge bg-warning me-2">Medium Density</span>
+                        <span class="badge bg-danger me-2">High Density</span>
+                    </div>
+                    <small class="text-muted" id="node-count">0 nodes active</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Simulation Controls</h5>
+            </div>
+            <div class="card-body">
+                <form id="simulation-form">
+                    <div class="mb-3">
+                        <label for="scenario-select" class="form-label">Simulation Scenario</label>
+                        <select class="form-select" id="scenario-select">
+                            <option value="urban">Urban Environment</option>
+                            <option value="highway">Highway Scenario</option>
+                            <option value="suburban">Suburban Area</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="broker-address" class="form-label">MQTT Broker Address</label>
+                        <input type="text" class="form-control" id="broker-address" value="localhost">
+                    </div>
+                    <div class="mb-3">
+                        <label for="broker-port" class="form-label">MQTT Broker Port</label>
+                        <input type="number" class="form-control" id="broker-port" value="1883">
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary" id="start-btn">Start Simulation</button>
+                        <button type="button" class="btn btn-danger" id="stop-btn" disabled>Stop Simulation</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Metrics</h5>
+            </div>
+            <div class="card-body">
+                <div id="metrics-container">
+                    <!-- Metrics will be updated here -->
+                    <p class="text-muted">Start the simulation to see metrics</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Group Formation Status</h5>
+            </div>
+            <div class="card-body">
+                <div id="groups-container">
+                    <p class="text-muted">No groups formed yet</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+<script>
+    // Global variables
+    let map;
+    let socket;
+    let isMapInitialized = false;
+    let simulationRunning = false;
+    
+    // Initialize when the page is loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log("DOM loaded in simulation.html");
+        initializeMap();
+        setupSocketConnection();
+        setupEventListeners();
+    });
+    
+    function initializeMap() {
+        console.log("Initializing map in simulation.html");
+        try {
+            // Get map element
+            const mapElement = document.getElementById('map');
+            if (!mapElement) {
+                console.error("Map element not found");
+                return;
+            }
+            
+            // Ensure the map has the correct dimensions
+            mapElement.style.height = '600px';
+            mapElement.style.width = '100%';
+            
+            // Initialize the Leaflet map
+            map = L.map('map', {
+                zoomControl: true,
+                minZoom: 2,
+                maxZoom: 18
+            }).setView([28.6139, 77.2090], 13); // Delhi coordinates
+            
+            // Add the OpenStreetMap tile layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+            
+            // Add a test marker to confirm the map is working
+            L.marker([28.6139, 77.2090])
+                .addTo(map)
+                .bindPopup('Map is ready! Start the simulation to see RSUs.')
+                .openPopup();
+            
+            console.log("Map initialized successfully");
+            isMapInitialized = true;
+            
+            // Force a resize after a small delay to ensure proper rendering
+            setTimeout(() => {
+                if (map) {
+                    console.log("Forcing map resize");
+                    map.invalidateSize(true);
+                }
+            }, 500);
+        } catch (error) {
+            console.error("Error initializing map:", error);
+            showNotification('Failed to initialize map: ' + error.message, 'error');
+        }
+    }
+    
+    function setupSocketConnection() {
+        console.log("Setting up Socket.IO connection");
+        
+        // Initialize Socket.IO connection
+        socket = io({
+            reconnection: true,
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000
+        });
+        
+        // Handle socket events
+        socket.on('connect', () => {
+            console.log('Connected to server');
+            updateConnectionStatus('connected');
+            showNotification('Connected to server', 'success');
+        });
+        
+        socket.on('connect_error', (error) => {
+            console.error('Socket connection error:', error);
+            updateConnectionStatus('error');
+            showNotification('Connection error: ' + error.message, 'error');
+        });
+        
+        socket.on('disconnect', () => {
+            console.log('Disconnected from server');
+            updateConnectionStatus('disconnected');
+            showNotification('Disconnected from server', 'warning');
+        });
+        
+        // Handle metrics updates
+        socket.on('metrics_update', function(metrics) {
+            console.log('Received metrics update:', metrics);
+            
+            // Update the metrics display and map
+            updateMetrics(metrics);
+            updateMap(metrics);
+            
+            // Update node count
+            document.getElementById('node-count').textContent = 
+                Object.keys(metrics).length + ' nodes active';
+            
+            // Fetch and update group formation if simulation is running
+            if (simulationRunning) {
+                fetchGroups();
+            }
+        });
+    }
+    
+    function setupEventListeners() {
+        // Form submission
+        document.getElementById('simulation-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            startSimulation();
+        });
+        
+        // Stop button
+        document.getElementById('stop-btn').addEventListener('click', function() {
+            stopSimulation();
+        });
+        
+        // Toggle RSU coverage
+        document.getElementById('show-coverage').addEventListener('change', function() {
+            toggleCoverage(this.checked);
+        });
+    }
+    
+    function startSimulation() {
+        console.log("Starting simulation");
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        
+        startBtn.disabled = true;
+        startBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Starting...';
+        
+        const config = {
+            broker_address: document.getElementById('broker-address').value,
+            broker_port: parseInt(document.getElementById('broker-port').value),
+            scenario: document.getElementById('scenario-select').value
+        };
+        
+        fetch('/api/start_simulation', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(config)
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.status === 'success') {
+                simulationRunning = true;
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                startBtn.innerHTML = 'Simulation Running';
+                
+                // Update simulation status
+                document.getElementById('simulation-status').textContent = 'Simulation running';
+                
+                showNotification('Simulation started successfully', 'success');
+            } else {
+                throw new Error(data.error || 'Failed to start simulation');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            startBtn.innerHTML = 'Start Simulation';
+            showNotification('Failed to start simulation: ' + error.message, 'error');
+        });
+    }
+    
+    function stopSimulation() {
+        console.log("Stopping simulation");
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        
+        stopBtn.disabled = true;
+        stopBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Stopping...';
+        
+        fetch('/api/stop_simulation', {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                simulationRunning = false;
+                startBtn.disabled = false;
+                startBtn.innerHTML = 'Start Simulation';
+                stopBtn.disabled = true;
+                stopBtn.innerHTML = 'Stop Simulation';
+                
+                // Update simulation status
+                document.getElementById('simulation-status').textContent = 'Simulation stopped';
+                
+                showNotification('Simulation stopped successfully', 'info');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            stopBtn.disabled = false;
+            stopBtn.innerHTML = 'Stop Simulation';
+            showNotification('Failed to stop simulation: ' + error.message, 'error');
+        });
+    }
+    
+    function fetchGroups() {
+        console.log("Fetching group information");
+        fetch('/api/get_groups')
+            .then(response => response.json())
+            .then(groups => {
+                updateGroupDisplay(groups);
+            })
+            .catch(error => {
+                console.error('Error fetching groups:', error);
+            });
+    }
+    
+    function updateGroupDisplay(groups) {
+        const container = document.getElementById('groups-container');
+        if (!container) return;
+        
+        if (Object.keys(groups).length === 0) {
+            container.innerHTML = '<p class="text-muted">No groups formed yet</p>';
+            return;
+        }
+        
+        container.innerHTML = '<div class="row">';
+        
+        for (const [groupId, members] of Object.entries(groups)) {
+            const groupDiv = document.createElement('div');
+            groupDiv.className = 'col-md-4 mb-3';
+            
+            let membersList = members.map(m => `RSU ${m}`).join(', ');
+            
+            groupDiv.innerHTML = `
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        Group ${groupId}
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Members:</strong> ${membersList}</p>
+                        <p><strong>Size:</strong> ${members.length} RSUs</p>
+                    </div>
+                </div>
+            `;
+            
+            container.appendChild(groupDiv);
+        }
+        
+        container.innerHTML += '</div>';
+    }
+    
+    function updateConnectionStatus(status) {
+        const badge = document.getElementById('connection-badge');
+        
+        switch(status) {
+            case 'connected':
+                badge.className = 'badge bg-success';
+                badge.textContent = 'Connected';
+                break;
+            case 'disconnected':
+                badge.className = 'badge bg-secondary';
+                badge.textContent = 'Disconnected';
+                break;
+            case 'error':
+                badge.className = 'badge bg-danger';
+                badge.textContent = 'Connection Error';
+                break;
+        }
+    }
+    
+    function toggleCoverage(show) {
+        console.log("Toggling RSU coverage:", show);
+        // In a real app, this would toggle the visibility of RSU coverage circles
+    }
+    
+    // Import functions from main.js
+    // In case the functions aren't available yet, define them here as well
+    if (typeof updateMap !== 'function') {
+        function updateMap(metrics) {
+            console.log("Update map function called from inline script");
+            // Implementation is in main.js
+            // This is just a fallback
+        }
+    }
+    
+    if (typeof updateMetrics !== 'function') {
+        function updateMetrics(metrics) {
+            console.log("Update metrics function called from inline script");
+            const container = document.getElementById('metrics-container');
+            if (!container) return;
+            
+            container.innerHTML = '';
+            
+            for (const [rsu_id, data] of Object.entries(metrics)) {
+                const metricDiv = document.createElement('div');
+                metricDiv.className = 'metric-item';
+                metricDiv.innerHTML = `
+                    <h6>RSU ${rsu_id}</h6>
+                    <p>Vehicle Density: ${data.vehicle_density}</p>
+                    <p>Link Loss: ${data.avg_link_loss}</p>
+                    <p>Centrality: ${data.degree_centrality}</p>
+                `;
+                container.appendChild(metricDiv);
+            }
+        }
+    }
+    
+    if (typeof showNotification !== 'function') {
+        function showNotification(message, type = 'info') {
+            console.log("Show notification function called from inline script");
+            const notification = document.createElement('div');
+            notification.className = `alert alert-${type} alert-dismissible fade show`;
+            notification.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            document.querySelector('.container').insertBefore(notification, document.querySelector('.row'));
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 5000);
+        }
+    }
+</script>
+{% endblock %}

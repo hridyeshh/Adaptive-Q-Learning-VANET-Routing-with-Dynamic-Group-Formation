@@ -1,0 +1,471 @@
+{% extends "base.html" %}
+
+{% block title %}Debug Test{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+<style>
+    #map {
+        height: 400px;
+        width: 100%;
+        z-index: 1;
+    }
+    .debug-card {
+        margin-bottom: 15px;
+    }
+    .status-indicator {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 5px;
+    }
+    .status-success {
+        background-color: #28a745;
+    }
+    .status-warning {
+        background-color: #ffc107;
+    }
+    .status-error {
+        background-color: #dc3545;
+    }
+    .status-inactive {
+        background-color: #6c757d;
+    }
+    pre {
+        background-color: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+        max-height: 200px;
+        overflow: auto;
+    }
+    .log-container {
+        height: 200px;
+        overflow-y: auto;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+        padding: 10px;
+        font-family: monospace;
+        font-size: 0.9rem;
+    }
+    .log-info {
+        color: #0d6efd;
+    }
+    .log-success {
+        color: #198754;
+    }
+    .log-warning {
+        color: #ffc107;
+    }
+    .log-error {
+        color: #dc3545;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">VANET Simulation Debug Tool</h2>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card debug-card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Connection Status</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-3">
+                    <span>Socket.IO Connection:</span>
+                    <span>
+                        <span class="status-indicator status-inactive" id="socket-status"></span>
+                        <span id="socket-status-text">Not Connected</span>
+                    </span>
+                </div>
+                <div class="d-flex justify-content-between mb-3">
+                    <span>MQTT Connection:</span>
+                    <span>
+                        <span class="status-indicator status-inactive" id="mqtt-status"></span>
+                        <span id="mqtt-status-text">Not Tested</span>
+                    </span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span>API Endpoints:</span>
+                    <span>
+                        <span class="status-indicator status-inactive" id="api-status"></span>
+                        <span id="api-status-text">Not Tested</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card debug-card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Debug Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="broker-address" class="form-label">MQTT Broker Address</label>
+                    <input type="text" class="form-control" id="broker-address" value="localhost">
+                </div>
+                <div class="mb-3">
+                    <label for="broker-port" class="form-label">MQTT Broker Port</label>
+                    <input type="number" class="form-control" id="broker-port" value="1883">
+                </div>
+                <div class="d-grid gap-2">
+                    <button class="btn btn-primary" id="test-mqtt-btn">Test MQTT Connection</button>
+                    <button class="btn btn-info" id="test-api-btn">Test API Endpoints</button>
+                    <button class="btn btn-success" id="generate-data-btn">Generate Test Data</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card debug-card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Map Test</h5>
+            </div>
+            <div class="card-body p-0">
+                <div id="map"></div>
+            </div>
+            <div class="card-footer">
+                <button class="btn btn-sm btn-outline-primary" id="add-marker-btn">Add Test Marker</button>
+                <button class="btn btn-sm btn-outline-danger" id="clear-markers-btn">Clear Markers</button>
+            </div>
+        </div>
+
+        <div class="card debug-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Debug Log</h5>
+                <button class="btn btn-sm btn-outline-secondary" id="clear-log-btn">Clear</button>
+            </div>
+            <div class="card-body p-0">
+                <div class="log-container" id="debug-log"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-3">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Test Data</h5>
+            </div>
+            <div class="card-body">
+                <pre id="test-data-output">No data generated yet.</pre>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+<script>
+    // Global variables
+    let map;
+    let socket;
+    let markers = [];
+    let connectionChecked = false;
+    
+    // Initialize when the page is loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        initMap();
+        initSocket();
+        setupEventListeners();
+        logMessage('Debug tool initialized', 'info');
+    });
+    
+    function initMap() {
+        try {
+            // Initialize map
+            logMessage('Initializing map...', 'info');
+            map = L.map('map').setView([28.6139, 77.2090], 13);
+            
+            // Add tile layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+            
+            // Add a test marker
+            addTestMarker();
+            
+            logMessage('Map initialized successfully', 'success');
+        } catch (error) {
+            logMessage('Error initializing map: ' + error.message, 'error');
+            updateStatus('map', 'error', 'Error: ' + error.message);
+        }
+    }
+    
+    function initSocket() {
+        try {
+            logMessage('Initializing Socket.IO connection...', 'info');
+            
+            // Initialize Socket.IO
+            socket = io({
+                reconnection: true,
+                reconnectionAttempts: 5,
+                reconnectionDelay: 1000
+            });
+            
+            // Socket.IO event handlers
+            socket.on('connect', function() {
+                logMessage('Socket.IO connected successfully', 'success');
+                updateStatus('socket', 'success', 'Connected');
+                
+                // Test event
+                socket.emit('test_event', { message: 'Hello from debug tool' });
+            });
+            
+            socket.on('connect_error', function(error) {
+                logMessage('Socket.IO connection error: ' + error, 'error');
+                updateStatus('socket', 'error', 'Connection Error');
+            });
+            
+            socket.on('disconnect', function() {
+                logMessage('Socket.IO disconnected', 'warning');
+                updateStatus('socket', 'warning', 'Disconnected');
+            });
+            
+            socket.on('test_response', function(data) {
+                logMessage('Received test response: ' + JSON.stringify(data), 'info');
+            });
+            
+            socket.on('metrics_update', function(metrics) {
+                logMessage('Received metrics update with ' + Object.keys(metrics).length + ' RSUs', 'info');
+                displayTestData(metrics);
+                updateMapWithMetrics(metrics);
+            });
+        } catch (error) {
+            logMessage('Error initializing Socket.IO: ' + error.message, 'error');
+        }
+    }
+    
+    function setupEventListeners() {
+        // Add test marker button
+        document.getElementById('add-marker-btn').addEventListener('click', function() {
+            addTestMarker();
+        });
+        
+        // Clear markers button
+        document.getElementById('clear-markers-btn').addEventListener('click', function() {
+            clearMarkers();
+        });
+        
+        // Test MQTT connection button
+        document.getElementById('test-mqtt-btn').addEventListener('click', function() {
+            testMQTTConnection();
+        });
+        
+        // Test API endpoints button
+        document.getElementById('test-api-btn').addEventListener('click', function() {
+            testAPIEndpoints();
+        });
+        
+        // Generate test data button
+        document.getElementById('generate-data-btn').addEventListener('click', function() {
+            generateTestData();
+        });
+        
+        // Clear log button
+        document.getElementById('clear-log-btn').addEventListener('click', function() {
+            clearLog();
+        });
+    }
+    
+    function addTestMarker() {
+        // Generate a random position near Delhi
+        const lat = 28.6139 + (Math.random() - 0.5) * 0.05;
+        const lng = 77.2090 + (Math.random() - 0.5) * 0.05;
+        
+        // Create a marker
+        const marker = L.marker([lat, lng]).addTo(map);
+        marker.bindPopup(`Test Marker<br>Position: [${lat.toFixed(4)}, ${lng.toFixed(4)}]`);
+        
+        // Add to markers array
+        markers.push(marker);
+        
+        logMessage(`Added test marker at [${lat.toFixed(4)}, ${lng.toFixed(4)}]`, 'info');
+    }
+    
+    function clearMarkers() {
+        // Remove all markers
+        markers.forEach(marker => {
+            map.removeLayer(marker);
+        });
+        markers = [];
+        
+        logMessage('All markers cleared', 'info');
+    }
+    
+    function testMQTTConnection() {
+        const broker = document.getElementById('broker-address').value;
+        const port = document.getElementById('broker-port').value;
+        
+        logMessage(`Testing MQTT connection to ${broker}:${port}...`, 'info');
+        updateStatus('mqtt', 'warning', 'Testing...');
+        
+        // Make API request to test MQTT connection
+        fetch('/api/test_mqtt_connection', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                broker_address: broker,
+                broker_port: parseInt(port)
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                logMessage('MQTT connection successful', 'success');
+                updateStatus('mqtt', 'success', 'Connected');
+            } else {
+                logMessage('MQTT connection failed: ' + data.error, 'error');
+                updateStatus('mqtt', 'error', 'Failed');
+            }
+        })
+        .catch(error => {
+            logMessage('Error testing MQTT connection: ' + error.message, 'error');
+            updateStatus('mqtt', 'error', 'Error');
+        });
+    }
+    
+    function testAPIEndpoints() {
+        logMessage('Testing API endpoints...', 'info');
+        updateStatus('api', 'warning', 'Testing...');
+        
+        // Test the endpoints sequentially
+        fetch('/api/test_endpoints')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                logMessage('API endpoints test successful', 'success');
+                updateStatus('api', 'success', 'Available');
+                
+                // Log detailed results
+                if (data.results) {
+                    Object.entries(data.results).forEach(([endpoint, result]) => {
+                        const status = result ? 'success' : 'error';
+                        logMessage(`Endpoint ${endpoint}: ${result ? 'OK' : 'Failed'}`, status);
+                    });
+                }
+            } else {
+                logMessage('API endpoints test failed: ' + data.error, 'error');
+                updateStatus('api', 'error', 'Failed');
+            }
+        })
+        .catch(error => {
+            logMessage('Error testing API endpoints: ' + error.message, 'error');
+            updateStatus('api', 'error', 'Error');
+        });
+    }
+    
+    function generateTestData() {
+        logMessage('Generating test data...', 'info');
+        
+        // Generate test RSU metrics
+        const testMetrics = {};
+        const rsuCount = 5;
+        
+        for (let i = 0; i < rsuCount; i++) {
+            const lat = 28.6139 + (Math.random() - 0.5) * 0.05;
+            const lng = 77.2090 + (Math.random() - 0.5) * 0.05;
+            
+            testMetrics[i] = {
+                vehicle_density: Math.floor(Math.random() * 30),
+                avg_link_loss: Math.random() * 0.5,
+                degree_centrality: 0.3 + Math.random() * 0.7,
+                position: { lat, lng }
+            };
+        }
+        
+        // Display the test data
+        displayTestData(testMetrics);
+        
+        // Update the map
+        updateMapWithMetrics(testMetrics);
+        
+        logMessage('Test data generated for ' + rsuCount + ' RSUs', 'success');
+    }
+    
+    function updateMapWithMetrics(metrics) {
+        // Clear existing markers
+        clearMarkers();
+        
+        // Add new markers for each RSU
+        for (const [rsu_id, data] of Object.entries(metrics)) {
+            if (data.position) {
+                const { lat, lng } = data.position;
+                
+                // Determine circle color based on vehicle density
+                let color = '#28a745'; // Green for low density
+                if (data.vehicle_density > 20) {
+                    color = '#dc3545'; // Red for high density
+                } else if (data.vehicle_density > 10) {
+                    color = '#ffc107'; // Yellow for medium density
+                }
+                
+                // Create circle marker
+                const circle = L.circle([lat, lng], {
+                    color: color,
+                    fillColor: color,
+                    fillOpacity: 0.3,
+                    radius: 100 + (data.vehicle_density * 10)
+                }).addTo(map);
+                
+                // Create popup content
+                const popupContent = `
+                    <strong>RSU ${rsu_id}</strong><br>
+                    Vehicle Density: ${data.vehicle_density}<br>
+                    Link Loss: ${(data.avg_link_loss * 100).toFixed(1)}%<br>
+                    Centrality: ${data.degree_centrality.toFixed(2)}
+                `;
+                
+                circle.bindPopup(popupContent);
+                markers.push(circle);
+            }
+        }
+        
+        // Fit map bounds if we have markers
+        if (markers.length > 0) {
+            const group = L.featureGroup(markers);
+            map.fitBounds(group.getBounds().pad(0.1));
+        }
+    }
+    
+    function displayTestData(data) {
+        const outputElement = document.getElementById('test-data-output');
+        outputElement.textContent = JSON.stringify(data, null, 2);
+    }
+    
+    function updateStatus(type, status, text) {
+        const statusElement = document.getElementById(`${type}-status`);
+        const textElement = document.getElementById(`${type}-status-text`);
+        
+        if (statusElement && textElement) {
+            statusElement.className = `status-indicator status-${status}`;
+            textElement.textContent = text;
+        }
+    }
+    
+    function logMessage(message, type = 'info') {
+        const logContainer = document.getElementById('debug-log');
+        const timestamp = new Date().toLocaleTimeString();
+        
+        const logEntry = document.createElement('div');
+        logEntry.className = `log-${type}`;
+        logEntry.textContent = `[${timestamp}] ${message}`;
+        
+        logContainer.appendChild(logEntry);
+        logContainer.scrollTop = logContainer.scrollHeight;
+    }
+    
+    function clearLog() {
+        const logContainer = document.getElementById('debug-log');
+        logContainer.innerHTML = '';
+        logMessage('Log cleared', 'info');
+    }
+</script>
+{% endblock %}
