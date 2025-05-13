@@ -180,7 +180,3 @@ This work is based on the research paper:
 - **Mridul Singla** - 2021UCM2830
 
 Netaji Subhas University of Technology, Delhi
-
----
-
-⭐ Star this repository if you find it helpful!
