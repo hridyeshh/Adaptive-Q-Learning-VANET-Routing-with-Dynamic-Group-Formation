@@ -1,6 +1,5 @@
 # Adaptive-Q-Learning-VANET-Routing-with-Dynamic-Group-Formation
 
-# Adaptive Q-Learning VANET Routing with Dynamic Group Formation
 
 A sophisticated Vehicular Ad Hoc Network (VANET) simulation platform that implements adaptive Q-learning-based routing with dynamic group formation. This project demonstrates intelligent routing in vehicular networks using reinforcement learning and real-time clustering algorithms.
 
