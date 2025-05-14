@@ -24,8 +24,33 @@
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         background-color: white;
     }
+    .location-name {
+        font-size: 0.9em;
+        color: #6c757d;
+        font-style: italic;
+    }
     .connection-status {
         margin-bottom: 15px;
+    }
+    .dataset-status {
+        margin-top: 10px;
+    }
+    .dataset-status .badge {
+        margin-right: 5px;
+    }
+    /* Group visualization styles */
+    .group-card {
+        height: 100%;
+        transition: transform 0.2s;
+    }
+    .group-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .group-locations {
+        font-size: 0.85em;
+        color: #6c757d;
+        margin-top: 5px;
     }
 </style>
 {% endblock %}
@@ -36,6 +61,10 @@
 <div class="connection-status">
     <span id="connection-badge" class="badge bg-secondary">Disconnected</span>
     <span id="simulation-status">Simulation not running</span>
+    <div class="dataset-status">
+        <span id="routing-dataset-badge" class="badge bg-secondary">Routing Dataset: Not Loaded</span>
+        <span id="pdr-dataset-badge" class="badge bg-secondary">PDR Dataset: Not Loaded</span>
+    </div>
 </div>
 
 <div class="row">
@@ -87,6 +116,24 @@
                         <label for="broker-port" class="form-label">MQTT Broker Port</label>
                         <input type="number" class="form-control" id="broker-port" value="1883">
                     </div>
+                    
+                    <!-- Dataset Upload Section -->
+                    <div class="mb-3">
+                        <label class="form-label">Datasets</label>
+                        <div class="input-group mb-2">
+                            <input type="file" class="form-control" id="routing-dataset-file" accept=".csv">
+                            <button class="btn btn-outline-secondary" type="button" id="upload-routing-btn">
+                                <i class="fas fa-upload"></i> Routing
+                            </button>
+                        </div>
+                        <div class="input-group">
+                            <input type="file" class="form-control" id="pdr-dataset-file" accept=".csv">
+                            <button class="btn btn-outline-secondary" type="button" id="upload-pdr-btn">
+                                <i class="fas fa-upload"></i> PDR
+                            </button>
+                        </div>
+                    </div>
+                    
                     <div class="d-grid gap-2">
                         <button type="submit" class="btn btn-primary" id="start-btn">Start Simulation</button>
                         <button type="button" class="btn btn-danger" id="stop-btn" disabled>Stop Simulation</button>
@@ -96,8 +143,9 @@
         </div>
         
         <div class="card">
-            <div class="card-header">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="card-title mb-0">Metrics</h5>
+                <small class="text-muted" id="simulation-time">Time: 0s</small>
             </div>
             <div class="card-body">
                 <div id="metrics-container">
@@ -133,6 +181,8 @@
     let socket;
     let isMapInitialized = false;
     let simulationRunning = false;
+    let rsuMarkers = {};
+    let currentLocations = {};
     
     // Initialize when the page is loaded
     document.addEventListener('DOMContentLoaded', function() {
@@ -140,6 +190,7 @@
         initializeMap();
         setupSocketConnection();
         setupEventListeners();
+        checkDatasetStatus();
     });
     
     function initializeMap() {
@@ -223,6 +274,13 @@
         socket.on('metrics_update', function(metrics) {
             console.log('Received metrics update:', metrics);
             
+            // Store location names
+            for (const [rsu_id, data] of Object.entries(metrics)) {
+                if (data.location_name) {
+                    currentLocations[rsu_id] = data.location_name;
+                }
+            }
+            
             // Update the metrics display and map
             updateMetrics(metrics);
             updateMap(metrics);
@@ -253,6 +311,87 @@
         // Toggle RSU coverage
         document.getElementById('show-coverage').addEventListener('change', function() {
             toggleCoverage(this.checked);
+        });
+        
+        // Dataset upload buttons
+        document.getElementById('upload-routing-btn').addEventListener('click', function() {
+            uploadDataset('routing');
+        });
+        
+        document.getElementById('upload-pdr-btn').addEventListener('click', function() {
+            uploadDataset('pdr');
+        });
+    }
+    
+    function checkDatasetStatus() {
+        fetch('/api/get_dataset_status')
+            .then(response => response.json())
+            .then(data => {
+                updateDatasetStatus('routing', data.routing_dataset_loaded);
+                updateDatasetStatus('pdr', data.pdr_dataset_loaded);
+                
+                // Store locations if available
+                if (data.locations) {
+                    currentLocations = data.locations;
+                }
+            })
+            .catch(error => {
+                console.error('Error checking dataset status:', error);
+            });
+    }
+    
+    function updateDatasetStatus(type, loaded) {
+        const badge = document.getElementById(`${type}-dataset-badge`);
+        if (loaded) {
+            badge.className = 'badge bg-success';
+            badge.textContent = `${type.toUpperCase()} Dataset: Loaded`;
+        } else {
+            badge.className = 'badge bg-secondary';
+            badge.textContent = `${type.toUpperCase()} Dataset: Not Loaded`;
+        }
+    }
+    
+    function uploadDataset(type) {
+        const fileInput = document.getElementById(`${type}-dataset-file`);
+        const file = fileInput.files[0];
+        
+        if (!file) {
+            showNotification(`Please select a ${type} dataset file`, 'warning');
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const uploadBtn = document.getElementById(`upload-${type}-btn`);
+        uploadBtn.disabled = true;
+        uploadBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Uploading...';
+        
+        fetch(`/api/upload_${type}_dataset`, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                showNotification(`${type.toUpperCase()} dataset uploaded successfully`, 'success');
+                updateDatasetStatus(type, true);
+                
+                // Update locations if routing dataset
+                if (type === 'routing' && data.locations) {
+                    currentLocations = data.locations;
+                }
+            } else {
+                throw new Error(data.error || `Failed to upload ${type} dataset`);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification(`Failed to upload ${type} dataset: ${error.message}`, 'error');
+        })
+        .finally(() => {
+            uploadBtn.disabled = false;
+            uploadBtn.innerHTML = `<i class="fas fa-upload"></i> ${type.charAt(0).toUpperCase() + type.slice(1)}`;
         });
     }
     
@@ -345,17 +484,21 @@
         console.log("Fetching group information");
         fetch('/api/get_groups')
             .then(response => response.json())
-            .then(groups => {
-                updateGroupDisplay(groups);
+            .then(data => {
+                updateGroupDisplay(data);
+                updateSimulationTime(data.simulation_time);
             })
             .catch(error => {
                 console.error('Error fetching groups:', error);
             });
     }
     
-    function updateGroupDisplay(groups) {
+    function updateGroupDisplay(data) {
         const container = document.getElementById('groups-container');
         if (!container) return;
+        
+        const groups = data.groups || {};
+        const visualization = data.visualization || {};
         
         if (Object.keys(groups).length === 0) {
             container.innerHTML = '<p class="text-muted">No groups formed yet</p>';
@@ -364,20 +507,34 @@
         
         container.innerHTML = '<div class="row">';
         
-        for (const [groupId, members] of Object.entries(groups)) {
+        // Use visualization data if available, otherwise fallback to groups
+        const groupData = Object.keys(visualization).length > 0 ? visualization : groups;
+        
+        for (const [groupId, members] of Object.entries(groupData)) {
+            if (groupId.includes('_locations')) continue; // Skip location entries
+            
             const groupDiv = document.createElement('div');
             groupDiv.className = 'col-md-4 mb-3';
             
-            let membersList = members.map(m => `RSU ${m}`).join(', ');
+            let membersList = Array.isArray(members) ? members : Object.keys(members);
+            let locationsHtml = '';
+            
+            // Add location names if available
+            if (visualization[`${groupId}_locations`]) {
+                locationsHtml = `<div class="group-locations">
+                    <strong>Locations:</strong> ${visualization[`${groupId}_locations`].join(', ')}
+                </div>`;
+            }
             
             groupDiv.innerHTML = `
-                <div class="card">
+                <div class="card group-card">
                     <div class="card-header bg-primary text-white">
                         Group ${groupId}
                     </div>
                     <div class="card-body">
-                        <p><strong>Members:</strong> ${membersList}</p>
-                        <p><strong>Size:</strong> ${members.length} RSUs</p>
+                        <p><strong>Members:</strong> ${membersList.map(m => `RSU ${m}`).join(', ')}</p>
+                        <p><strong>Size:</strong> ${membersList.length} RSUs</p>
+                        ${locationsHtml}
                     </div>
                 </div>
             `;
@@ -386,6 +543,12 @@
         }
         
         container.innerHTML += '</div>';
+    }
+    
+    function updateSimulationTime(time) {
+        if (time !== undefined) {
+            document.getElementById('simulation-time').textContent = `Time: ${time.toFixed(1)}s`;
+        }
     }
     
     function updateConnectionStatus(status) {
@@ -409,56 +572,123 @@
     
     function toggleCoverage(show) {
         console.log("Toggling RSU coverage:", show);
-        // In a real app, this would toggle the visibility of RSU coverage circles
-    }
-    
-    // Import functions from main.js
-    // In case the functions aren't available yet, define them here as well
-    if (typeof updateMap !== 'function') {
-        function updateMap(metrics) {
-            console.log("Update map function called from inline script");
-            // Implementation is in main.js
-            // This is just a fallback
-        }
-    }
-    
-    if (typeof updateMetrics !== 'function') {
-        function updateMetrics(metrics) {
-            console.log("Update metrics function called from inline script");
-            const container = document.getElementById('metrics-container');
-            if (!container) return;
-            
-            container.innerHTML = '';
-            
-            for (const [rsu_id, data] of Object.entries(metrics)) {
-                const metricDiv = document.createElement('div');
-                metricDiv.className = 'metric-item';
-                metricDiv.innerHTML = `
-                    <h6>RSU ${rsu_id}</h6>
-                    <p>Vehicle Density: ${data.vehicle_density}</p>
-                    <p>Link Loss: ${data.avg_link_loss}</p>
-                    <p>Centrality: ${data.degree_centrality}</p>
-                `;
-                container.appendChild(metricDiv);
+        // Toggle visibility of RSU coverage circles
+        for (const [id, marker] of Object.entries(rsuMarkers)) {
+            if (marker.circle) {
+                if (show) {
+                    marker.circle.addTo(map);
+                } else {
+                    map.removeLayer(marker.circle);
+                }
             }
         }
     }
     
-    if (typeof showNotification !== 'function') {
-        function showNotification(message, type = 'info') {
-            console.log("Show notification function called from inline script");
-            const notification = document.createElement('div');
-            notification.className = `alert alert-${type} alert-dismissible fade show`;
-            notification.innerHTML = `
-                ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            `;
-            document.querySelector('.container').insertBefore(notification, document.querySelector('.row'));
-            
-            setTimeout(() => {
-                notification.remove();
-            }, 5000);
+    function updateMap(metrics) {
+        console.log("Updating map with enhanced metrics");
+        
+        // Clear existing markers
+        for (const [id, marker] of Object.entries(rsuMarkers)) {
+            if (marker.marker) map.removeLayer(marker.marker);
+            if (marker.circle) map.removeLayer(marker.circle);
         }
+        rsuMarkers = {};
+        
+        // Add new markers
+        for (const [rsu_id, data] of Object.entries(metrics)) {
+            const lat = data.latitude || (28.6139 + (Math.random() - 0.5) * 0.05);
+            const lng = data.longitude || (77.2090 + (Math.random() - 0.5) * 0.05);
+            
+            // Determine color based on vehicle density
+            let color = '#28a745'; // Green for low density
+            if (data.vehicle_density > 20) {
+                color = '#dc3545'; // Red for high density
+            } else if (data.vehicle_density > 10) {
+                color = '#ffc107'; // Yellow for medium density
+            }
+            
+            // Create circle for coverage
+            const circle = L.circle([lat, lng], {
+                color: color,
+                fillColor: color,
+                fillOpacity: 0.3,
+                radius: 100 + (data.vehicle_density * 10)
+            });
+            
+            // Create marker
+            const marker = L.marker([lat, lng]);
+            
+            // Create popup content with location name
+            const locationName = data.location_name || currentLocations[rsu_id] || `RSU ${rsu_id}`;
+            const popupContent = `
+                <strong>${locationName}</strong><br>
+                <small>ID: ${rsu_id}</small><br>
+                Vehicle Density: ${data.vehicle_density}<br>
+                Link Loss: ${(data.avg_link_loss * 100).toFixed(1)}%<br>
+                Centrality: ${data.degree_centrality.toFixed(2)}
+            `;
+            
+            marker.bindPopup(popupContent);
+            
+            // Add to map
+            marker.addTo(map);
+            if (document.getElementById('show-coverage').checked) {
+                circle.addTo(map);
+            }
+            
+            // Store references
+            rsuMarkers[rsu_id] = { marker, circle };
+        }
+    }
+    
+    function updateMetrics(metrics) {
+        console.log("Updating metrics display with location names");
+        const container = document.getElementById('metrics-container');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        for (const [rsu_id, data] of Object.entries(metrics)) {
+            const locationName = data.location_name || currentLocations[rsu_id] || '';
+            
+            const metricDiv = document.createElement('div');
+            metricDiv.className = 'metric-item';
+            
+            // Determine status class based on density
+            let statusClass = 'bg-success';
+            if (data.vehicle_density > 20) {
+                statusClass = 'bg-danger';
+            } else if (data.vehicle_density > 10) {
+                statusClass = 'bg-warning';
+            }
+            
+            metricDiv.innerHTML = `
+                <h6 class="d-flex justify-content-between align-items-center">
+                    RSU ${rsu_id}
+                    <span class="badge ${statusClass}">${data.vehicle_density}</span>
+                </h6>
+                ${locationName ? `<p class="location-name">${locationName}</p>` : ''}
+                <p class="mb-1">Link Loss: ${(data.avg_link_loss * 100).toFixed(1)}%</p>
+                <p class="mb-0">Centrality: ${data.degree_centrality.toFixed(2)}</p>
+            `;
+            
+            container.appendChild(metricDiv);
+        }
+    }
+    
+    function showNotification(message, type = 'info') {
+        console.log("Show notification:", message, type);
+        const notification = document.createElement('div');
+        notification.className = `alert alert-${type} alert-dismissible fade show`;
+        notification.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        document.querySelector('.container').insertBefore(notification, document.querySelector('.row'));
+        
+        setTimeout(() => {
+            notification.remove();
+        }, 5000);
     }
 </script>
 {% endblock %}
