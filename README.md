@@ -2,7 +2,7 @@
 
 A comprehensive simulation platform for vehicular ad-hoc networks (VANETs) implementing adaptive Q-Learning routing algorithms with dynamic vehicle group formation capabilities.
 
-![VANET Simulation](/api/placeholder/800/400)
+<img width="856" alt="visualisation" src="https://github.com/user-attachments/assets/a22f06e9-254d-4685-85a8-4d4908f760ae" />
 
 ## Features
 
