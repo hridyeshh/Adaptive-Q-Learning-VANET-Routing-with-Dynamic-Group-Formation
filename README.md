@@ -234,12 +234,3 @@ This work is based on the research paper:
 
 Netaji Subhas University of Technology, Delhi
 
-## 📞 Contact
-
-For API support and questions, please contact:
-- Email: hridyesh2309@gmail.com
-- GitHub Issues: [Create an issue](https://github.com/hridyeshh/Adaptive-Q-Learning-VANET-Routing-with-Dynamic-Group-Formation/issues)
-
----
-
-⭐ Star this repository if you find it helpful!
