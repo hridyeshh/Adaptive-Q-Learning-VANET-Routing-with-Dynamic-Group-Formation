@@ -1,0 +1,694 @@
+{% extends "base.html" %}
+
+{% block title %}Simulation{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+<style>
+    /* Inline critical CSS for the map */
+    #map {
+        height: 600px !important;
+        width: 100% !important;
+        z-index: 1;
+    }
+    .leaflet-container {
+        height: 600px;
+        width: 100%;
+    }
+    /* Add better styling for metrics */
+    .metric-item {
+        border: 1px solid #ddd;
+        padding: 15px;
+        margin-bottom: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        background-color: white;
+    }
+    .location-name {
+        font-size: 0.9em;
+        color: #6c757d;
+        font-style: italic;
+    }
+    .connection-status {
+        margin-bottom: 15px;
+    }
+    .dataset-status {
+        margin-top: 10px;
+    }
+    .dataset-status .badge {
+        margin-right: 5px;
+    }
+    /* Group visualization styles */
+    .group-card {
+        height: 100%;
+        transition: transform 0.2s;
+    }
+    .group-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .group-locations {
+        font-size: 0.85em;
+        color: #6c757d;
+        margin-top: 5px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">VANET Simulation Dashboard</h2>
+
+<div class="connection-status">
+    <span id="connection-badge" class="badge bg-secondary">Disconnected</span>
+    <span id="simulation-status">Simulation not running</span>
+    <div class="dataset-status">
+        <span id="routing-dataset-badge" class="badge bg-secondary">Routing Dataset: Not Loaded</span>
+        <span id="pdr-dataset-badge" class="badge bg-secondary">PDR Dataset: Not Loaded</span>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Network Visualization</h5>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="show-coverage" checked>
+                    <label class="form-check-label" for="show-coverage">Show RSU Coverage</label>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <!-- The map div must have explicit height -->
+                <div id="map"></div>
+            </div>
+            <div class="card-footer">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <span class="badge bg-success me-2">Low Density</span>
+                        <span class="badge bg-warning me-2">Medium Density</span>
+                        <span class="badge bg-danger me-2">High Density</span>
+                    </div>
+                    <small class="text-muted" id="node-count">0 nodes active</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Simulation Controls</h5>
+            </div>
+            <div class="card-body">
+                <form id="simulation-form">
+                    <div class="mb-3">
+                        <label for="scenario-select" class="form-label">Simulation Scenario</label>
+                        <select class="form-select" id="scenario-select">
+                            <option value="urban">Urban Environment</option>
+                            <option value="highway">Highway Scenario</option>
+                            <option value="suburban">Suburban Area</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="broker-address" class="form-label">MQTT Broker Address</label>
+                        <input type="text" class="form-control" id="broker-address" value="localhost">
+                    </div>
+                    <div class="mb-3">
+                        <label for="broker-port" class="form-label">MQTT Broker Port</label>
+                        <input type="number" class="form-control" id="broker-port" value="1883">
+                    </div>
+                    
+                    <!-- Dataset Upload Section -->
+                    <div class="mb-3">
+                        <label class="form-label">Datasets</label>
+                        <div class="input-group mb-2">
+                            <input type="file" class="form-control" id="routing-dataset-file" accept=".csv">
+                            <button class="btn btn-outline-secondary" type="button" id="upload-routing-btn">
+                                <i class="fas fa-upload"></i> Routing
+                            </button>
+                        </div>
+                        <div class="input-group">
+                            <input type="file" class="form-control" id="pdr-dataset-file" accept=".csv">
+                            <button class="btn btn-outline-secondary" type="button" id="upload-pdr-btn">
+                                <i class="fas fa-upload"></i> PDR
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary" id="start-btn">Start Simulation</button>
+                        <button type="button" class="btn btn-danger" id="stop-btn" disabled>Stop Simulation</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Metrics</h5>
+                <small class="text-muted" id="simulation-time">Time: 0s</small>
+            </div>
+            <div class="card-body">
+                <div id="metrics-container">
+                    <!-- Metrics will be updated here -->
+                    <p class="text-muted">Start the simulation to see metrics</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Group Formation Status</h5>
+            </div>
+            <div class="card-body">
+                <div id="groups-container">
+                    <p class="text-muted">No groups formed yet</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+<script>
+    // Global variables
+    let map;
+    let socket;
+    let isMapInitialized = false;
+    let simulationRunning = false;
+    let rsuMarkers = {};
+    let currentLocations = {};
+    
+    // Initialize when the page is loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log("DOM loaded in simulation.html");
+        initializeMap();
+        setupSocketConnection();
+        setupEventListeners();
+        checkDatasetStatus();
+    });
+    
+    function initializeMap() {
+        console.log("Initializing map in simulation.html");
+        try {
+            // Get map element
+            const mapElement = document.getElementById('map');
+            if (!mapElement) {
+                console.error("Map element not found");
+                return;
+            }
+            
+            // Ensure the map has the correct dimensions
+            mapElement.style.height = '600px';
+            mapElement.style.width = '100%';
+            
+            // Initialize the Leaflet map
+            map = L.map('map', {
+                zoomControl: true,
+                minZoom: 2,
+                maxZoom: 18
+            }).setView([28.6139, 77.2090], 13); // Delhi coordinates
+            
+            // Add the OpenStreetMap tile layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+            
+            // Add a test marker to confirm the map is working
+            L.marker([28.6139, 77.2090])
+                .addTo(map)
+                .bindPopup('Map is ready! Start the simulation to see RSUs.')
+                .openPopup();
+            
+            console.log("Map initialized successfully");
+            isMapInitialized = true;
+            
+            // Force a resize after a small delay to ensure proper rendering
+            setTimeout(() => {
+                if (map) {
+                    console.log("Forcing map resize");
+                    map.invalidateSize(true);
+                }
+            }, 500);
+        } catch (error) {
+            console.error("Error initializing map:", error);
+            showNotification('Failed to initialize map: ' + error.message, 'error');
+        }
+    }
+    
+    function setupSocketConnection() {
+        console.log("Setting up Socket.IO connection");
+        
+        // Initialize Socket.IO connection
+        socket = io({
+            reconnection: true,
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000
+        });
+        
+        // Handle socket events
+        socket.on('connect', () => {
+            console.log('Connected to server');
+            updateConnectionStatus('connected');
+            showNotification('Connected to server', 'success');
+        });
+        
+        socket.on('connect_error', (error) => {
+            console.error('Socket connection error:', error);
+            updateConnectionStatus('error');
+            showNotification('Connection error: ' + error.message, 'error');
+        });
+        
+        socket.on('disconnect', () => {
+            console.log('Disconnected from server');
+            updateConnectionStatus('disconnected');
+            showNotification('Disconnected from server', 'warning');
+        });
+        
+        // Handle metrics updates
+        socket.on('metrics_update', function(metrics) {
+            console.log('Received metrics update:', metrics);
+            
+            // Store location names
+            for (const [rsu_id, data] of Object.entries(metrics)) {
+                if (data.location_name) {
+                    currentLocations[rsu_id] = data.location_name;
+                }
+            }
+            
+            // Update the metrics display and map
+            updateMetrics(metrics);
+            updateMap(metrics);
+            
+            // Update node count
+            document.getElementById('node-count').textContent = 
+                Object.keys(metrics).length + ' nodes active';
+            
+            // Fetch and update group formation if simulation is running
+            if (simulationRunning) {
+                fetchGroups();
+            }
+        });
+    }
+    
+    function setupEventListeners() {
+        // Form submission
+        document.getElementById('simulation-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            startSimulation();
+        });
+        
+        // Stop button
+        document.getElementById('stop-btn').addEventListener('click', function() {
+            stopSimulation();
+        });
+        
+        // Toggle RSU coverage
+        document.getElementById('show-coverage').addEventListener('change', function() {
+            toggleCoverage(this.checked);
+        });
+        
+        // Dataset upload buttons
+        document.getElementById('upload-routing-btn').addEventListener('click', function() {
+            uploadDataset('routing');
+        });
+        
+        document.getElementById('upload-pdr-btn').addEventListener('click', function() {
+            uploadDataset('pdr');
+        });
+    }
+    
+    function checkDatasetStatus() {
+        fetch('/api/get_dataset_status')
+            .then(response => response.json())
+            .then(data => {
+                updateDatasetStatus('routing', data.routing_dataset_loaded);
+                updateDatasetStatus('pdr', data.pdr_dataset_loaded);
+                
+                // Store locations if available
+                if (data.locations) {
+                    currentLocations = data.locations;
+                }
+            })
+            .catch(error => {
+                console.error('Error checking dataset status:', error);
+            });
+    }
+    
+    function updateDatasetStatus(type, loaded) {
+        const badge = document.getElementById(`${type}-dataset-badge`);
+        if (loaded) {
+            badge.className = 'badge bg-success';
+            badge.textContent = `${type.toUpperCase()} Dataset: Loaded`;
+        } else {
+            badge.className = 'badge bg-secondary';
+            badge.textContent = `${type.toUpperCase()} Dataset: Not Loaded`;
+        }
+    }
+    
+    function uploadDataset(type) {
+        const fileInput = document.getElementById(`${type}-dataset-file`);
+        const file = fileInput.files[0];
+        
+        if (!file) {
+            showNotification(`Please select a ${type} dataset file`, 'warning');
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const uploadBtn = document.getElementById(`upload-${type}-btn`);
+        uploadBtn.disabled = true;
+        uploadBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Uploading...';
+        
+        fetch(`/api/upload_${type}_dataset`, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                showNotification(`${type.toUpperCase()} dataset uploaded successfully`, 'success');
+                updateDatasetStatus(type, true);
+                
+                // Update locations if routing dataset
+                if (type === 'routing' && data.locations) {
+                    currentLocations = data.locations;
+                }
+            } else {
+                throw new Error(data.error || `Failed to upload ${type} dataset`);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification(`Failed to upload ${type} dataset: ${error.message}`, 'error');
+        })
+        .finally(() => {
+            uploadBtn.disabled = false;
+            uploadBtn.innerHTML = `<i class="fas fa-upload"></i> ${type.charAt(0).toUpperCase() + type.slice(1)}`;
+        });
+    }
+    
+    function startSimulation() {
+        console.log("Starting simulation");
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        
+        startBtn.disabled = true;
+        startBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Starting...';
+        
+        const config = {
+            broker_address: document.getElementById('broker-address').value,
+            broker_port: parseInt(document.getElementById('broker-port').value),
+            scenario: document.getElementById('scenario-select').value
+        };
+        
+        fetch('/api/start_simulation', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(config)
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.status === 'success') {
+                simulationRunning = true;
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                startBtn.innerHTML = 'Simulation Running';
+                
+                // Update simulation status
+                document.getElementById('simulation-status').textContent = 'Simulation running';
+                
+                showNotification('Simulation started successfully', 'success');
+            } else {
+                throw new Error(data.error || 'Failed to start simulation');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            startBtn.innerHTML = 'Start Simulation';
+            showNotification('Failed to start simulation: ' + error.message, 'error');
+        });
+    }
+    
+    function stopSimulation() {
+        console.log("Stopping simulation");
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        
+        stopBtn.disabled = true;
+        stopBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Stopping...';
+        
+        fetch('/api/stop_simulation', {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                simulationRunning = false;
+                startBtn.disabled = false;
+                startBtn.innerHTML = 'Start Simulation';
+                stopBtn.disabled = true;
+                stopBtn.innerHTML = 'Stop Simulation';
+                
+                // Update simulation status
+                document.getElementById('simulation-status').textContent = 'Simulation stopped';
+                
+                showNotification('Simulation stopped successfully', 'info');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            stopBtn.disabled = false;
+            stopBtn.innerHTML = 'Stop Simulation';
+            showNotification('Failed to stop simulation: ' + error.message, 'error');
+        });
+    }
+    
+    function fetchGroups() {
+        console.log("Fetching group information");
+        fetch('/api/get_groups')
+            .then(response => response.json())
+            .then(data => {
+                updateGroupDisplay(data);
+                updateSimulationTime(data.simulation_time);
+            })
+            .catch(error => {
+                console.error('Error fetching groups:', error);
+            });
+    }
+    
+    function updateGroupDisplay(data) {
+        const container = document.getElementById('groups-container');
+        if (!container) return;
+        
+        const groups = data.groups || {};
+        const visualization = data.visualization || {};
+        
+        if (Object.keys(groups).length === 0) {
+            container.innerHTML = '<p class="text-muted">No groups formed yet</p>';
+            return;
+        }
+        
+        container.innerHTML = '<div class="row">';
+        
+        // Use visualization data if available, otherwise fallback to groups
+        const groupData = Object.keys(visualization).length > 0 ? visualization : groups;
+        
+        for (const [groupId, members] of Object.entries(groupData)) {
+            if (groupId.includes('_locations')) continue; // Skip location entries
+            
+            const groupDiv = document.createElement('div');
+            groupDiv.className = 'col-md-4 mb-3';
+            
+            let membersList = Array.isArray(members) ? members : Object.keys(members);
+            let locationsHtml = '';
+            
+            // Add location names if available
+            if (visualization[`${groupId}_locations`]) {
+                locationsHtml = `<div class="group-locations">
+                    <strong>Locations:</strong> ${visualization[`${groupId}_locations`].join(', ')}
+                </div>`;
+            }
+            
+            groupDiv.innerHTML = `
+                <div class="card group-card">
+                    <div class="card-header bg-primary text-white">
+                        Group ${groupId}
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Members:</strong> ${membersList.map(m => `RSU ${m}`).join(', ')}</p>
+                        <p><strong>Size:</strong> ${membersList.length} RSUs</p>
+                        ${locationsHtml}
+                    </div>
+                </div>
+            `;
+            
+            container.appendChild(groupDiv);
+        }
+        
+        container.innerHTML += '</div>';
+    }
+    
+    function updateSimulationTime(time) {
+        if (time !== undefined) {
+            document.getElementById('simulation-time').textContent = `Time: ${time.toFixed(1)}s`;
+        }
+    }
+    
+    function updateConnectionStatus(status) {
+        const badge = document.getElementById('connection-badge');
+        
+        switch(status) {
+            case 'connected':
+                badge.className = 'badge bg-success';
+                badge.textContent = 'Connected';
+                break;
+            case 'disconnected':
+                badge.className = 'badge bg-secondary';
+                badge.textContent = 'Disconnected';
+                break;
+            case 'error':
+                badge.className = 'badge bg-danger';
+                badge.textContent = 'Connection Error';
+                break;
+        }
+    }
+    
+    function toggleCoverage(show) {
+        console.log("Toggling RSU coverage:", show);
+        // Toggle visibility of RSU coverage circles
+        for (const [id, marker] of Object.entries(rsuMarkers)) {
+            if (marker.circle) {
+                if (show) {
+                    marker.circle.addTo(map);
+                } else {
+                    map.removeLayer(marker.circle);
+                }
+            }
+        }
+    }
+    
+    function updateMap(metrics) {
+        console.log("Updating map with enhanced metrics");
+        
+        // Clear existing markers
+        for (const [id, marker] of Object.entries(rsuMarkers)) {
+            if (marker.marker) map.removeLayer(marker.marker);
+            if (marker.circle) map.removeLayer(marker.circle);
+        }
+        rsuMarkers = {};
+        
+        // Add new markers
+        for (const [rsu_id, data] of Object.entries(metrics)) {
+            const lat = data.latitude || (28.6139 + (Math.random() - 0.5) * 0.05);
+            const lng = data.longitude || (77.2090 + (Math.random() - 0.5) * 0.05);
+            
+            // Determine color based on vehicle density
+            let color = '#28a745'; // Green for low density
+            if (data.vehicle_density > 20) {
+                color = '#dc3545'; // Red for high density
+            } else if (data.vehicle_density > 10) {
+                color = '#ffc107'; // Yellow for medium density
+            }
+            
+            // Create circle for coverage
+            const circle = L.circle([lat, lng], {
+                color: color,
+                fillColor: color,
+                fillOpacity: 0.3,
+                radius: 100 + (data.vehicle_density * 10)
+            });
+            
+            // Create marker
+            const marker = L.marker([lat, lng]);
+            
+            // Create popup content with location name
+            const locationName = data.location_name || currentLocations[rsu_id] || `RSU ${rsu_id}`;
+            const popupContent = `
+                <strong>${locationName}</strong><br>
+                <small>ID: ${rsu_id}</small><br>
+                Vehicle Density: ${data.vehicle_density}<br>
+                Link Loss: ${(data.avg_link_loss * 100).toFixed(1)}%<br>
+                Centrality: ${data.degree_centrality.toFixed(2)}
+            `;
+            
+            marker.bindPopup(popupContent);
+            
+            // Add to map
+            marker.addTo(map);
+            if (document.getElementById('show-coverage').checked) {
+                circle.addTo(map);
+            }
+            
+            // Store references
+            rsuMarkers[rsu_id] = { marker, circle };
+        }
+    }
+    
+    function updateMetrics(metrics) {
+        console.log("Updating metrics display with location names");
+        const container = document.getElementById('metrics-container');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        for (const [rsu_id, data] of Object.entries(metrics)) {
+            const locationName = data.location_name || currentLocations[rsu_id] || '';
+            
+            const metricDiv = document.createElement('div');
+            metricDiv.className = 'metric-item';
+            
+            // Determine status class based on density
+            let statusClass = 'bg-success';
+            if (data.vehicle_density > 20) {
+                statusClass = 'bg-danger';
+            } else if (data.vehicle_density > 10) {
+                statusClass = 'bg-warning';
+            }
+            
+            metricDiv.innerHTML = `
+                <h6 class="d-flex justify-content-between align-items-center">
+                    RSU ${rsu_id}
+                    <span class="badge ${statusClass}">${data.vehicle_density}</span>
+                </h6>
+                ${locationName ? `<p class="location-name">${locationName}</p>` : ''}
+                <p class="mb-1">Link Loss: ${(data.avg_link_loss * 100).toFixed(1)}%</p>
+                <p class="mb-0">Centrality: ${data.degree_centrality.toFixed(2)}</p>
+            `;
+            
+            container.appendChild(metricDiv);
+        }
+    }
+    
+    function showNotification(message, type = 'info') {
+        console.log("Show notification:", message, type);
+        const notification = document.createElement('div');
+        notification.className = `alert alert-${type} alert-dismissible fade show`;
+        notification.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        document.querySelector('.container').insertBefore(notification, document.querySelector('.row'));
+        
+        setTimeout(() => {
+            notification.remove();
+        }, 5000);
+    }
+</script>
+{% endblock %}

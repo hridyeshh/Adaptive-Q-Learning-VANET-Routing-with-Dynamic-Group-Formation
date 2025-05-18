@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VANET Standalone Simulation</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .header {
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            color: white;
+            padding: 20px 0;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        #map {
+            height: 600px;
+            width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            position: relative;
+        }
+        .card {
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+        }
+        .metric-item {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            background-color: white;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .location-search {
+            position: absolute;
+            top: 10px;
+            width: 90%;
+            left: 5%;
+            right: 5%;
+            z-index: 2000;
+        }
+        .location-search .input-group {
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            z-index: 2001;
+        }
+        .location-search .form-control {
+            border: none;
+            height: 45px;
+            padding-left: 15px;
+        }
+        .location-search .input-group-text {
+            background-color: white;
+            border: none;
+            color: #6c757d;
+        }
+        .location-search .btn {
+            height: 45px;
+            padding: 0 15px;
+            border-radius: 0 8px 8px 0;
+        }
+        .current-location-display {
+            position: absolute;
+            bottom: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 8px 15px;
+            border-radius: 20px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            min-width: 200px;
+            justify-content: center;
+        }
+        .current-location-display i {
+            margin-right: 8px;
+            color: #6a11cb;
+        }
+        #location-suggestions {
+            display: none;
+            position: absolute;
+            top: 45px;
+            left: 0;
+            right: 0;
+            z-index: 2002;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 0 0 8px 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: -1px;
+        }
+        .suggestion-item {
+            padding: 10px 15px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .suggestion-item:hover {
+            background-color: #f8f9fa;
+        }
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+        .suggestion-name {
+            font-weight: 500;
+            color: #333;
+        }
+        .suggestion-address {
+            font-size: 0.85rem;
+            color: #6c757d;
+            margin-top: 2px;
+        }
+        .leaflet-control-geocoder {
+            display: none;
+        }
+        .suggestion-loading {
+            padding: 15px;
+            text-align: center;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1>Adaptive Q-Learning VANET Routing</h1>
+                    <p class="lead mb-0">Dynamic Group Formation Simulation</p>
+                </div>
+                <div class="col-md-4 text-md-end">
+                    <div class="status-badge bg-success text-white">Standalone Mode</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="row">
+            <!-- Map Column -->
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">Network Visualization</h5>
+                        <span id="node-count" class="badge bg-primary">0 nodes active</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div style="position: relative;">
+                            <!-- Custom search box -->
+                            <div class="location-search">
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                    <input type="text" class="form-control" id="location-search-input" placeholder="Search for any location worldwide...">
+                                    <button class="btn btn-primary" type="button" id="clear-search">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                                <div id="location-suggestions"></div>
+                            </div>
+                            
+                            <!-- Current location display -->
+                            <div class="current-location-display" id="current-location-display">
+                                <i class="fas fa-map-marker-alt"></i>
+                                <span id="location-name">Delhi, India</span>
+                            </div>
+                            
+                            <div id="map"></div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <span class="badge bg-success me-2">Low Density</span>
+                                <span class="badge bg-warning me-2">Medium Density</span>
+                                <span class="badge bg-danger me-2">High Density</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Group Formation Card -->
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Group Formation</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="groups-container">
+                            <p class="text-muted">No groups formed yet</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controls and Metrics Column -->
+            <div class="col-lg-4">
+                <!-- Simulation Controls Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Simulation Controls</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="scenario-select" class="form-label">Simulation Scenario</label>
+                            <select class="form-select" id="scenario-select">
+                                <option value="urban">Urban Environment</option>
+                                <option value="highway">Highway Scenario</option>
+                                <option value="suburban">Suburban Area</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Vehicle Density</label>
+                            <input type="range" class="form-range" min="5" max="50" step="5" value="20" id="density-slider">
+                            <div class="d-flex justify-content-between">
+                                <span>Low</span>
+                                <span>Medium</span>
+                                <span>High</span>
+                            </div>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-primary" id="start-btn">Start Simulation</button>
+                            <button type="button" class="btn btn-danger" id="stop-btn" disabled>Stop Simulation</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Metrics Card -->
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Metrics</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="metrics-container">
+                            <p class="text-muted">Start the simulation to see metrics</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+    <script>
+        // Global variables
+        let map;
+        let geocoder;
+        let markers = {};
+        let locationMarker = null;
+        let simulationRunning = false;
+        let animationInterval;
+        let currentScenario = 'urban';
+        let currentDensity = 20;
+        let currentLocation = {
+            name: 'Delhi, India',
+            lat: 28.6139,
+            lng: 77.2090
+        };
+        let searchTimeout;
+        
+        // Initialize when the page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize map
+            initMap();
+            
+            // Set up search functionality
+            setupSearch();
+            
+            // Set up event listeners
+            document.getElementById('start-btn').addEventListener('click', startSimulation);
+            document.getElementById('stop-btn').addEventListener('click', stopSimulation);
+            document.getElementById('scenario-select').addEventListener('change', function() {
+                currentScenario = this.value;
+                if (simulationRunning) {
+                    // Restart simulation with new scenario
+                    stopSimulation();
+                    startSimulation();
+                }
+            });
+            document.getElementById('density-slider').addEventListener('input', function() {
+                currentDensity = parseInt(this.value);
+                if (simulationRunning) {
+                    // Update metrics without restarting
+                    updateSimulation();
+                }
+            });
+            
+            // Clear search button
+            document.getElementById('clear-search').addEventListener('click', function() {
+                document.getElementById('location-search-input').value = '';
+                document.getElementById('location-suggestions').style.display = 'none';
+            });
+        });
+        
+        // Initialize map
+        function initMap() {
+            // Create the map
+            map = L.map('map').setView([currentLocation.lat, currentLocation.lng], 13);
+            
+            // Add the tile layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+            
+            // Add a marker for the initial location
+            updateLocationMarker();
+            
+            // Initialize the geocoder
+            geocoder = L.Control.Geocoder.nominatim();
+            
+            // For debugging
+            console.log("Geocoder initialized:", geocoder);
+        }
+        
+        // Set up search functionality
+        function setupSearch() {
+            const searchInput = document.getElementById('location-search-input');
+            const suggestionsContainer = document.getElementById('location-suggestions');
+
+            searchInput.addEventListener('input', function() {
+                const query = this.value.trim();
+                
+                // Clear previous timeout
+                if (searchTimeout) {
+                    clearTimeout(searchTimeout);
+                }
+                
+                // Hide suggestions if query is too short
+                if (query.length < 3) {
+                    suggestionsContainer.style.display = 'none';
+                    return;
+                }
+                
+                // Set timeout to avoid too many requests while typing
+                searchTimeout = setTimeout(() => {
+                    // Show loading message
+                    suggestionsContainer.innerHTML = '<div class="suggestion-loading">Searching...</div>';
+                    suggestionsContainer.style.display = 'block';
+                    
+                    // Use the geocoder to search for locations
+                    console.log("Searching for:", query);
+                    
+                    // Using Nominatim API directly for better control
+                    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`)
+                        .then(response => response.json())
+                        .then(results => {
+                            console.log("Search results:", results);
+                            
+                            // Clear previous suggestions
+                            suggestionsContainer.innerHTML = '';
+                            
+                            if (!results || results.length === 0) {
+                                suggestionsContainer.innerHTML = '<div class="suggestion-item">No results found</div>';
+                                suggestionsContainer.style.display = 'block';
+                                return;
+                            }
+                            
+                            // Add suggestions to container
+                            results.forEach(function(result) {
+                                const item = document.createElement('div');
+                                item.className = 'suggestion-item';
+                                
+                                // Extract name and address
+                                let name = result.display_name.split(',')[0];
+                                let address = result.display_name;
+                                
+                                item.innerHTML = `
+                                    <div class="suggestion-name">${name}</div>
+                                    <div class="suggestion-address">${address}</div>
+                                `;
+                                
+                                // Add click event to select location
+                                item.addEventListener('click', function() {
+                                    selectLocation({
+                                        name: name,
+                                        displayName: address,
+                                        lat: parseFloat(result.lat),
+                                        lng: parseFloat(result.lon)
+                                    });
+                                    
+                                    // Update search input and hide suggestions
+                                    searchInput.value = name;
+                                    suggestionsContainer.style.display = 'none';
+                                });
+                                
+                                suggestionsContainer.appendChild(item);
+                            });
+                            
+                            // Show suggestions
+                            suggestionsContainer.style.display = 'block';
+                        })
+                        .catch(error => {
+                            console.error("Geocoding error:", error);
+                            suggestionsContainer.innerHTML = '<div class="suggestion-item">Error searching. Please try again.</div>';
+                            suggestionsContainer.style.display = 'block';
+                        });
+                }, 300);
+            });
+            
+            // Hide suggestions when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!searchInput.contains(e.target) && !suggestionsContainer.contains(e.target)) {
+                    suggestionsContainer.style.display = 'none';
+                }
+            });
+        }
+        
+        // Select a location from search results
+        function selectLocation(location) {
+            // Update current location
+            currentLocation = {
+                name: location.name,
+                displayName: location.displayName || location.name,
+                lat: location.lat,
+                lng: location.lng
+            };
+            
+            // Update location display
+            document.getElementById('location-name').textContent = currentLocation.name;
+            
+            // Update map view
+            map.setView([currentLocation.lat, currentLocation.lng], 13);
+            
+            // Update location marker
+            updateLocationMarker();
+            
+            // Update simulation if running
+            if (simulationRunning) {
+                updateSimulation();
+            }
+            
+            // Show notification
+            showNotification(`Location set to ${currentLocation.name}`, 'info');
+        }
+        
+        // Update the location marker on the map
+        function updateLocationMarker() {
+            // Remove previous marker if it exists
+            if (locationMarker) {
+                map.removeLayer(locationMarker);
+            }
+            
+            // Add new marker
+            locationMarker = L.marker([currentLocation.lat, currentLocation.lng])
+                .addTo(map)
+                .bindPopup(`<strong>${currentLocation.name}</strong><br>Start the simulation to see RSUs in this area.`)
+                .openPopup();
+        }
+        
+        // Start simulation
+        function startSimulation() {
+            // Update UI
+            document.getElementById('start-btn').disabled = true;
+            document.getElementById('stop-btn').disabled = false;
+            
+            // Set simulation state
+            simulationRunning = true;
+            
+            // Generate initial data
+            updateSimulation();
+            
+            // Start animation loop
+            animationInterval = setInterval(updateSimulation, 2000);
+            
+            // Show notification
+            showNotification(`Simulation started at ${currentLocation.name}`, 'success');
+        }
+        
+        // Stop simulation
+        function stopSimulation() {
+            // Update UI
+            document.getElementById('start-btn').disabled = false;
+            document.getElementById('stop-btn').disabled = true;
+            
+            // Set simulation state
+            simulationRunning = false;
+            
+            // Stop animation loop
+            clearInterval(animationInterval);
+            
+            // Show notification
+            showNotification('Simulation stopped', 'info');
+        }
+        
+        // Update simulation
+        function updateSimulation() {
+            // Generate metrics
+            const metrics = generateMetrics();
+            
+            // Update map
+            updateMap(metrics);
+            
+            // Update metrics display
+            updateMetricsDisplay(metrics);
+            
+            // Update groups
+            updateGroups(metrics);
+            
+            // Update node count
+            document.getElementById('node-count').textContent = Object.keys(metrics).length + ' nodes active';
+        }
+        
+        // Generate metrics based on simulation parameters
+        function generateMetrics() {
+            const metrics = {};
+            
+            // Determine number of RSUs based on scenario
+            let rsuCount;
+            if (currentScenario === 'urban') {
+                rsuCount = 8;
+            } else if (currentScenario === 'highway') {
+                rsuCount = 5;
+            } else {
+                rsuCount = 6;
+            }
+            
+            // Base position (current location)
+            const baseLat = currentLocation.lat;
+            const baseLng = currentLocation.lng;
+            
+            // Time-varying factor
+            const time = Date.now() / 1000;
+            const timeFactor = time % 60 / 60; // 0-1 value that cycles every minute
+            
+            // Generate metrics for each RSU
+            for (let i = 0; i < rsuCount; i++) {
+                // Position based on scenario
+                let lat, lng;
+                
+                if (currentScenario === 'urban') {
+                    // Grid layout for urban
+                    const row = Math.floor(i / 3);
+                    const col = i % 3;
+                    lat = baseLat + (row * 0.005);
+                    lng = baseLng + (col * 0.005);
+                } else if (currentScenario === 'highway') {
+                    // Linear layout for highway
+                    lat = baseLat;
+                    lng = baseLng + (i * 0.008);
+                } else {
+                    // Scattered layout for suburban
+                    lat = baseLat + ((Math.random() - 0.5) * 0.02);
+                    lng = baseLng + ((Math.random() - 0.5) * 0.02);
+                }
+                
+                // Add some movement
+                lat += Math.sin(timeFactor * Math.PI * 2 + i) * 0.0005;
+                lng += Math.cos(timeFactor * Math.PI * 2 + i) * 0.0005;
+                
+                // Vehicle density based on slider and position
+                const densityBase = currentDensity / 2;
+                const densityVariation = Math.sin(timeFactor * Math.PI * 2 + i) * 5;
+                const vehicleDensity = Math.max(1, Math.round(densityBase + densityVariation + i));
+                
+                // Link loss based on density
+                const linkLossBase = Math.min(0.8, vehicleDensity / 100);
+                const linkLossVariation = Math.sin(timeFactor * Math.PI * 4 + i) * 0.1;
+                const avgLinkLoss = Math.max(0.05, Math.min(0.95, linkLossBase + linkLossVariation));
+                
+                // Centrality (inverse of link loss)
+                const centralityBase = 1 - (avgLinkLoss * 0.8);
+                const centralityVariation = Math.cos(timeFactor * Math.PI * 3 + i) * 0.1;
+                const degreeCentrality = Math.max(0.05, Math.min(0.95, centralityBase + centralityVariation));
+                
+                // Add to metrics
+                metrics[i] = {
+                    vehicle_density: vehicleDensity,
+                    avg_link_loss: avgLinkLoss,
+                    degree_centrality: degreeCentrality,
+                    position: {
+                        lat: lat,
+                        lng: lng
+                    }
+                };
+            }
+            
+            return metrics;
+        }
+        
+        // Update map with metrics
+        function updateMap(metrics) {
+            // Remove old markers
+            for (const id in markers) {
+                map.removeLayer(markers[id]);
+            }
+            markers = {};
+            
+            // Add new markers
+            for (const [id, data] of Object.entries(metrics)) {
+                if (data.position) {
+                    const { lat, lng } = data.position;
+                    
+                    // Determine color based on vehicle density
+                    let color = '#28a745'; // Green for low density
+                    if (data.vehicle_density > currentDensity) {
+                        color = '#dc3545'; // Red for high density
+                    } else if (data.vehicle_density > currentDensity / 2) {
+                        color = '#ffc107'; // Yellow for medium density
+                    }
+                    
+                    // Create circle
+                    const circle = L.circle([lat, lng], {
+                        color: color,
+                        fillColor: color,
+                        fillOpacity: 0.5,
+                        radius: 100 + (data.vehicle_density * 10)
+                    }).addTo(map);
+                    
+                    // Create popup content
+                    const popupContent = `
+                        <strong>RSU ${id}</strong><br>
+                        Vehicle Density: ${data.vehicle_density}<br>
+                        Link Loss: ${(data.avg_link_loss * 100).toFixed(1)}%<br>
+                        Centrality: ${data.degree_centrality.toFixed(2)}
+                    `;
+                    
+                    circle.bindPopup(popupContent);
+                    markers[id] = circle;
+                }
+            }
+            
+            // Fit map to markers
+            if (Object.keys(markers).length > 0) {
+                const group = L.featureGroup(Object.values(markers));
+                map.fitBounds(group.getBounds().pad(0.1));
+            }
+        }
+        
+        // Update metrics display
+        function updateMetricsDisplay(metrics) {
+            const container = document.getElementById('metrics-container');
+            container.innerHTML = '';
+            
+            if (Object.keys(metrics).length === 0) {
+                container.innerHTML = '<p class="text-muted">No metrics available</p>';
+                return;
+            }
+            
+            for (const [id, data] of Object.entries(metrics)) {
+                const metricDiv = document.createElement('div');
+                metricDiv.className = 'metric-item';
+                
+                // Determine status class based on density
+                let statusClass = 'bg-success';
+                if (data.vehicle_density > currentDensity) {
+                    statusClass = 'bg-danger';
+                } else if (data.vehicle_density > currentDensity / 2) {
+                    statusClass = 'bg-warning';
+                }
+                
+                metricDiv.innerHTML = `
+                    <h6 class="d-flex justify-content-between">
+                        RSU ${id}
+                        <span class="badge ${statusClass}">${data.vehicle_density}</span>
+                    </h6>
+                    <p>Link Loss: ${(data.avg_link_loss * 100).toFixed(1)}%</p>
+                    <p>Centrality: ${data.degree_centrality.toFixed(2)}</p>
+                `;
+                
+                container.appendChild(metricDiv);
+            }
+        }
+        
+        // Update groups display
+        function updateGroups(metrics) {
+            // Simple group formation algorithm
+            const groups = formGroups(metrics);
+            
+            // Update display
+            const container = document.getElementById('groups-container');
+            
+            if (Object.keys(groups).length === 0) {
+                container.innerHTML = '<p class="text-muted">No groups formed yet</p>';
+                return;
+            }
+            
+            container.innerHTML = '<div class="row">';
+            
+            for (const [groupId, members] of Object.entries(groups)) {
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'col-md-4 mb-3';
+                
+                const membersList = members.map(m => `RSU ${m}`).join(', ');
+                
+                groupDiv.innerHTML = `
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            Group ${groupId}
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Members:</strong> ${membersList}</p>
+                            <p><strong>Size:</strong> ${members.length} RSUs</p>
+                        </div>
+                    </div>
+                `;
+                
+                container.appendChild(groupDiv);
+            }
+            
+            container.innerHTML += '</div>';
+        }
+        
+        // Form groups based on metrics
+        function formGroups(metrics) {
+            const groups = {};
+            
+            // Skip if no metrics
+            if (Object.keys(metrics).length === 0) {
+                return groups;
+            }
+            
+            // Get RSU IDs
+            const rsus = Object.keys(metrics);
+            
+            // Simple grouping algorithm based on position
+            const remaining = new Set(rsus);
+            let groupId = 0;
+            
+            while (remaining.size > 0) {
+                // Start a new group with the first remaining RSU
+                const current = Array.from(remaining)[0];
+                const group = [current];
+                remaining.delete(current);
+                
+                // Add similar RSUs to this group
+                for (const rsu of Array.from(remaining)) {
+                    if (areSimilar(metrics, current, rsu)) {
+                        group.push(rsu);
+                        remaining.delete(rsu);
+                        
+                        // Limit group size
+                        if (group.length >= 4) {
+                            break;
+                        }
+                    }
+                }
+                
+                // Add the group
+                groups[groupId] = group;
+                groupId++;
+            }
+            
+            return groups;
+        }
+        
+        // Check if two RSUs are similar
+        function areSimilar(metrics, rsu1, rsu2) {
+            try {
+                const m1 = metrics[rsu1];
+                const m2 = metrics[rsu2];
+                
+                // Calculate distance if positions are available
+                if (m1.position && m2.position) {
+                    const lat1 = m1.position.lat;
+                    const lng1 = m1.position.lng;
+                    const lat2 = m2.position.lat;
+                    const lng2 = m2.position.lng;
+                    
+                    const distance = Math.sqrt(
+                        Math.pow(lat1 - lat2, 2) + 
+                        Math.pow(lng1 - lng2, 2)
+                    );
+                    
+                    // Simple threshold for grouping
+                    // Adjust based on scenario
+                    let threshold;
+                    if (currentScenario === 'urban') {
+                        threshold = 0.01;
+                    } else if (currentScenario === 'highway') {
+                        threshold = 0.015;
+                    } else {
+                        threshold = 0.02;
+                    }
+                    
+                    return distance < threshold;
+                }
+                
+                // Fallback to density similarity
+                return Math.abs(m1.vehicle_density - m2.vehicle_density) < 5;
+            } catch (e) {
+                console.error('Error comparing RSUs:', e);
+                return false;
+            }
+        }
+        
+        // Show notification
+        function showNotification(message, type = 'info') {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 end-0 m-3`;
+            notification.style.zIndex = '1050';
+            notification.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            
+            // Add to document
+            document.body.appendChild(notification);
+            
+            // Auto-dismiss after 3 seconds
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 150);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

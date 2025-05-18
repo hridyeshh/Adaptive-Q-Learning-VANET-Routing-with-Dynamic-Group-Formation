@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VANET Simulation Portal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+        }
+        
+        .hero {
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            color: white;
+            padding: 80px 0;
+            margin-bottom: 60px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            pointer-events: none;
+            bottom: 0;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0,0 L100,0 L100,100 Z" fill="rgba(255,255,255,0.1)"/></svg>');
+            background-size: 100% 100%;
+        }
+        
+        .hero h1 {
+            font-weight: 750;
+            font-size: 3.5rem;
+            margin-bottom: 20px;
+        }
+        
+        .hero p.lead {
+            font-size: 1.5rem;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+        
+        .feature-card {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s, box-shadow 0.3s;
+            height: 100%;
+            border: none;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.1);
+        }
+        
+        .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            color: #6a11cb;
+        }
+        
+        .cta-button {
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            border: none;
+            font-size: 1.25rem;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-weight: 600;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(37, 117, 252, 0.3);
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(37, 117, 252, 0.4);
+        }
+        
+        .preview-img {
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s;
+        }
+        
+        .preview-img:hover {
+            transform: scale(1.02);
+        }
+        
+        .preview-container {
+            position: relative;
+            margin-top: 40px;
+            margin-bottom: 60px;
+        }
+        
+        .preview-bar {
+            height: 45px;
+            background-color: #e9ecef;
+            border-radius: 10px 10px 0 0;
+            position: relative;
+            background: linear-gradient(to bottom, #f8f9fa, #e9ecef);
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .preview-dot {
+            height: 15px;
+            width: 15px;
+            border-radius: 50%;
+            background-color: #dc3545;
+            position: absolute;
+            left: 15px;
+            top: 15px;
+            box-shadow: 30px 0 0 #ffc107, 60px 0 0 #28a745;
+        }
+        
+        footer {
+            background-color: #343a40;
+            color: white;
+            padding: 40px 0;
+            margin-top: 60px;
+        }
+        
+        .footer-links {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .footer-links li {
+            margin-bottom: 10px;
+        }
+        
+        .footer-links a {
+            color: rgba(255, 255, 255, 0.7);
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+        
+        .footer-links a:hover {
+            color: white;
+        }
+        
+        .social-icon {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            text-align: center;
+            line-height: 40px;
+            margin-right: 10px;
+            transition: all 0.3s;
+            color: rgba(255, 255, 255, 0.7);
+        }
+        
+        .social-icon:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+            color: white;
+            transform: translateY(-2px);
+        }
+        
+        .map-animation {
+            position: relative;
+            width: 100%;
+            height: 300px;
+            background-color: #000000;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .vehicle {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background-color: #6a11cb;
+            border-radius: 50%;
+            transition: all 0.5s ease;
+        }
+        
+        .progress-container {
+            margin-top: 20px;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+        }
+        
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #6a11cb;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .navbar {
+            background-color: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+        
+        .nav-link {
+            font-weight: 500;
+            margin: 0 10px;
+        }
+        
+        .nav-item.active .nav-link {
+            color: #6a11cb !important;
+        }
+        
+        /* Animation for vehicles on the preview */
+        @keyframes moveVehicle1 {
+            0% { left: 10%; top: 20%; }
+            25% { left: 30%; top: 40%; }
+            50% { left: 60%; top: 30%; }
+            75% { left: 80%; top: 60%; }
+            100% { left: 10%; top: 20%; }
+        }
+        
+        @keyframes moveVehicle2 {
+            0% { left: 80%; top: 70%; }
+            25% { left: 60%; top: 50%; }
+            50% { left: 30%; top: 60%; }
+            75% { left: 20%; top: 30%; }
+            100% { left: 80%; top: 70%; }
+        }
+        
+        @keyframes moveVehicle3 {
+            0% { left: 40%; top: 80%; }
+            25% { left: 20%; top: 60%; }
+            50% { left: 50%; top: 20%; }
+            75% { left: 70%; top: 40%; }
+            100% { left: 40%; top: 80%; }
+        }
+        
+        @keyframes moveVehicle4 {
+            0% { left: 20%; top: 40%; }
+            25% { left: 40%; top: 60%; }
+            50% { left: 60%; top: 40%; }
+            75% { left: 40%; top: 20%; }
+            100% { left: 20%; top: 40%; }
+        }
+        
+        @keyframes moveVehicle5 {
+            0% { left: 60%; top: 20%; }
+            25% { left: 80%; top: 40%; }
+            50% { left: 60%; top: 60%; }
+            75% { left: 40%; top: 40%; }
+            100% { left: 60%; top: 20%; }
+        }
+        
+        @keyframes moveVehicle6 {
+            0% { left: 30%; top: 30%; }
+            25% { left: 50%; top: 50%; }
+            50% { left: 70%; top: 30%; }
+            75% { left: 50%; top: 10%; }
+            100% { left: 30%; top: 30%; }
+        }
+        
+        #vehicle1 {
+            animation: moveVehicle1 20s infinite;
+            background-color: #28a745;
+        }
+        
+        #vehicle2 {
+            animation: moveVehicle2 15s infinite;
+            background-color: #ffc107;
+        }
+        
+        #vehicle3 {
+            animation: moveVehicle3 18s infinite;
+            background-color: #dc3545;
+        }
+
+        #vehicle4 {
+            animation: moveVehicle4 17s infinite;
+            background-color: #17a2b8;
+        }
+
+        #vehicle5 {
+            animation: moveVehicle5 16s infinite;
+            background-color: #6f42c1;
+        }
+
+        #vehicle6 {
+            animation: moveVehicle6 19s infinite;
+            background-color: #fd7e14;
+        }
+        
+        #loading-progress {
+            width: 0%;
+            transition: width 3s ease-in-out;
+        }
+        
+        /* Style for hero launch button */
+        .hero-launch-btn {
+            color: white;
+            text-decoration: none;
+            display: inline-block;
+            background: linear-gradient(135deg, #000000 0%, #333333 100%);
+            border: none;
+            font-size: 1.25rem;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-weight: 600;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .hero-launch-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+            color: white;
+            text-decoration: none;
+            background: linear-gradient(135deg, #1a1a1a 0%, #404040 100%);
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light fixed-top">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <strong>VANET</strong> Simulation
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item active">
+                        <a class="nav-link" href="#">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#features">Features</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#preview">Preview</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link launch-simulation-btn" href="#">Launch Simulation</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-lg-6">
+                    <h1>Adaptive Q-Learning VANET Routing</h1>
+                    <p class="lead">Explore dynamic group formation in Vehicular Ad-hoc Networks with our interactive simulation tool</p>
+                    <a href="#" class="hero-launch-btn launch-simulation-btn">Launch Simulation</a>
+                </div>
+                <div class="col-lg-6">
+                    <div class="map-animation">
+                        <div class="vehicle" id="vehicle1"></div>
+                        <div class="vehicle" id="vehicle2"></div>
+                        <div class="vehicle" id="vehicle3"></div>
+                        <div class="vehicle" id="vehicle4"></div>
+                        <div class="vehicle" id="vehicle5"></div>
+                        <div class="vehicle" id="vehicle6"></div>
+                    </div
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Stats Section -->
+    <section class="container mb-5">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="stat-card text-center">
+                    <div class="stat-number">3</div>
+                    <div class="stat-label">Simulation Environments</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card text-center">
+                    <div class="stat-number">Real-time</div>
+                    <div class="stat-label">Data Visualization</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card text-center">
+                    <div class="stat-number">Adaptive</div>
+                    <div class="stat-label">Q-Learning Algorithms</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="container mb-5" id="features">
+        <div class="text-center mb-5">
+            <h2 class="fw-bold">Simulation Features</h2>
+            <p class="text-muted">Explore the capabilities of our VANET simulation platform</p>
+        </div>
+        
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="feature-card p-4">
+                    <div class="feature-icon">
+                        <i class="fas fa-map-marked-alt"></i>
+                    </div>
+                    <h4>Multiple Environments</h4>
+                    <p>Simulate VANET behavior in urban, highway, and suburban scenarios with different traffic patterns and infrastructure layouts.</p>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="feature-card p-4">
+                    <div class="feature-icon">
+                        <i class="fas fa-car"></i>
+                    </div>
+                    <h4>Vehicle Density Control</h4>
+                    <p>Adjust vehicle density to simulate various traffic conditions from low congestion to high-density urban scenarios.</p>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="feature-card p-4">
+                    <div class="feature-icon">
+                        <i class="fas fa-project-diagram"></i>
+                    </div>
+                    <h4>Dynamic Group Formation</h4>
+                    <p>Observe how vehicles automatically form communication groups based on proximity and network conditions.</p>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="feature-card p-4">
+                    <div class="feature-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h4>Real-time Metrics</h4>
+                    <p>Monitor key performance indicators including link loss, degree centrality, and traffic density in real-time.</p>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="feature-card p-4">
+                    <div class="feature-icon">
+                        <i class="fas fa-location-arrow"></i>
+                    </div>
+                    <h4>Global Location Support</h4>
+                    <p>Search and set any worldwide location as your simulation environment to test under various geographical conditions.</p>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="feature-card p-4">
+                    <div class="feature-icon">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <h4>Q-Learning Algorithm</h4>
+                    <p>Experience adaptive routing using reinforcement learning techniques that optimize network performance in real-time.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Preview Section -->
+    <section class="container mb-5" id="preview">
+        <div class="text-center mb-5">
+            <h2 class="fw-bold">Simulation Preview</h2>
+            <p class="text-muted">Get a glimpse of the simulation interface before you launch</p>
+        </div>
+        
+        <div class="preview-container">
+            <div class="preview-bar">
+                <div class="preview-dot"></div>
+            </div>
+            <img src="/api/placeholder/1200/visualisation.png" alt="VANET Simulation Preview" class="img-fluid preview-img" style="width:100%;">
+        </div>
+        
+        <div class="text-center mt-4">
+            <p>Ready to explore vehicular network dynamics?</p>
+            <a href="#" class="btn btn-primary cta-button launch-simulation-btn" id="preview-launch-btn">
+                Launch Full Simulation
+                <i class="fas fa-play ms-2"></i>
+            </a>
+        </div>
+    </section>
+
+    <!-- Loading Modal -->
+    <div class="modal fade" id="loadingModal" tabindex="-1" aria-labelledby="loadingModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="loadingModalLabel">Loading Simulation</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Please wait while the simulation environment is loading...</p>
+                    <div class="progress progress-container">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" role="progressbar" id="loading-progress" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-4 mb-4 mb-lg-0">
+                    <h5 class="fw-bold mb-3">VANET Simulation</h5>
+                    <p>An interactive platform for researching and exploring Vehicular Ad-hoc Networks with dynamic routing algorithms and group formation.</p>
+                    <div class="mt-4">
+                        <a href="https://github.com/hridyeshh/Adaptive-Q-Learning-VANET-Routing-with-Dynamic-Group-Formation" class="social-icon" target="_blank"><i class="fab fa-github"></i></a>
+                        <a href="https://x.com/hridyeshhh" class="social-icon" target="_blank"><i class="fab fa-twitter"></i></a>
+                        <a href="https://www.linkedin.com/in/hridyeshh/" class="social-icon" target="_blank"><i class="fab fa-linkedin"></i></a>
+                    </div>
+                </div>
+                <div class="col-lg-2 mb-4 mb-lg-0">
+                    <h6 class="fw-bold mb-3">Navigate</h6>
+                    <ul class="footer-links">
+                        <li><a href="#hero">Home</a></li>
+                        <li><a href="#features">Features</a></li>
+                        <li><a href="#preview">Preview</a></li>
+                        <li><a href="#" class="launch-simulation-btn">Simulation</a></li>
+                    </ul>
+                </div>
+                <div class="col-lg-3 mb-4 mb-lg-0">
+                    <h6 class="fw-bold mb-3">Resources</h6>
+                    <ul class="footer-links">
+                        <li><a target="_blank" href="https://github.com/hridyeshh/Adaptive-Q-Learning-VANET-Routing-with-Dynamic-Group-Formation/blob/main/README.md">Documentation</a></li>
+                        <li><a target="_blank" href="https://github.com/hridyeshh/Adaptive-Q-Learning-VANET-Routing-with-Dynamic-Group-Formation/tree/main/VANET/resources">Research Papers</a></li>
+                        <li><a target="_blank" href="https://github.com/hridyeshh/Adaptive-Q-Learning-VANET-Routing-with-Dynamic-Group-Formation/blob/main/API.md">API Reference</a></li>
+                        <li><a target="_blank" href="https://github.com/hridyeshh/Adaptive-Q-Learning-VANET-Routing-with-Dynamic-Group-Formation/blob/main/NETWORK_THEORY.md">Network Theory</a></li>
+                    </ul>
+                </div>
+                <div class="col-lg-3">
+                    <h6 class="fw-bold mb-3">Contact</h6>
+                    <ul class="footer-links">
+                        <li><i class="fas fa-envelope me-2"></i> hridyesh2309@gmail.com</li>
+                        <li><i class="fas fa-phone me-2"></i> +91 8130252611</li>
+                        <li><i class="fas fa-map-marker-alt me-2"></i> Netaji Subhas University of Technology, Delhi</li>
+                    </ul>
+                </div>
+            </div>
+            <hr class="mt-4 mb-4" style="border-color: rgba(255,255,255,0.1);">
+            <div class="text-center">
+                <p class="mb-0">&copy; 2025 VANET Simulation. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get all launch buttons by class
+            const launchButtons = document.querySelectorAll('.launch-simulation-btn');
+            const previewLaunchBtn = document.getElementById('preview-launch-btn');
+            const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+            
+            // Hide loading modal if it's visible when page loads
+            if (document.getElementById('loadingModal').classList.contains('show')) {
+                loadingModal.hide();
+            }
+            
+            function handleLaunch(e) {
+                e.preventDefault();
+                
+                // Show loading modal
+                loadingModal.show();
+                
+                // Animate progress bar
+                const progressBar = document.getElementById('loading-progress');
+                progressBar.style.width = '0%';
+                
+                // Force a reflow
+                progressBar.offsetHeight;
+                
+                setTimeout(() => {
+                    progressBar.style.width = '100%';
+                }, 100);
+                
+                // Redirect after animation completes
+                setTimeout(() => {
+                    window.location.href = '/simulation';
+                }, 2000);
+            }
+            
+            // Add event listener to all launch buttons
+            launchButtons.forEach(button => {
+                button.addEventListener('click', handleLaunch);
+            });
+            
+            // Handle page visibility change
+            document.addEventListener('visibilitychange', function() {
+                if (document.visibilityState === 'hidden') {
+                    loadingModal.hide();
+                }
+            });
+            
+            // Handle page unload
+            window.addEventListener('beforeunload', function() {
+                loadingModal.hide();
+            });
+            
+            // Smooth scrolling for anchor links
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function(e) {
+                    // Skip if this is a launch button
+                    if (anchor.classList.contains('launch-simulation-btn')) {
+                        return;
+                    }
+                    
+                    e.preventDefault();
+                    const targetId = this.getAttribute('href');
+                    if (targetId === '#') return;
+                    
+                    const targetElement = document.querySelector(targetId);
+                    if (targetElement) {
+                        window.scrollTo({
+                            top: targetElement.offsetTop - 80,
+                            behavior: 'smooth'
+                        });
+                    }
+                });
+            });
+            
+            // Activate nav links based on scroll position
+            window.addEventListener('scroll', function() {
+                const scrollPosition = window.scrollY;
+                
+                document.querySelectorAll('section').forEach(section => {
+                    const sectionTop = section.offsetTop - 100;
+                    const sectionHeight = section.offsetHeight;
+                    const sectionId = section.getAttribute('id');
+                    
+                    if (sectionId && scrollPosition >= sectionTop && scrollPosition < sectionTop + sectionHeight) {
+                        document.querySelectorAll('.nav-item').forEach(item => {
+                            item.classList.remove('active');
+                        });
+                        
+                        document.querySelector(`.nav-item a[href="#${sectionId}"]`)?.parentElement.classList.add('active');
+                    }
+                });
+                
+                // Set home as active when at the top
+                if (scrollPosition < 100) {
+                    document.querySelectorAll('.nav-item').forEach(item => {
+                        item.classList.remove('active');
+                    });
+                    document.querySelector('.nav-item:first-child').classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
