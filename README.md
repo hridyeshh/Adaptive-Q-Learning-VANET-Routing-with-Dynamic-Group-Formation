@@ -68,36 +68,48 @@ brew services start mosquitto
 
 ### Starting the Application
 
-1. Start the Flask web server:
+You can run the simulation using npm:
+
+1. Install npm dependencies:
+```bash
+npm install
+```
+
+2. Start the application:
+```bash
+npm start
+```
+
+3. Open your browser - entry.html will automatically load as the landing page.
+
+4. From the landing page (entry.html), you can:
+   - View project features
+   - See simulation preview
+   - Click any "Launch Simulation" button to open the simulation interface
+
+### Simulation Interface
+
+When you click "Launch Simulation", the standalone.html interface loads with the following features:
+
+- Interactive map display with dynamic vehicle visualization
+- Global location search functionality
+- Real-time metrics monitoring
+- Dynamic group formation visualization 
+- Adjustable simulation parameters:
+  - Select simulation scenario (Urban/Highway/Suburban)
+  - Adjust vehicle density (5-50 vehicles)
+  - Start/Stop simulation controls
+
+### Alternative Setup (Flask Server)
+
+Alternatively, you can run the application using the Flask server:
+
 ```bash
 cd src/python
 python app.py
 ```
 
-2. Open your browser and navigate to:
-```
-http://localhost:5001
-```
-
-3. Configure simulation parameters:
-   - Select simulation scenario (Urban/Highway/Suburban)
-   - Set MQTT broker address and port
-   - Adjust vehicle density
-   - Click "Start Simulation"
-
-### Standalone Mode
-
-For testing without MQTT broker:
-```
-http://localhost:5001/standalone.html
-```
-
-The standalone mode offers the following capabilities:
-- Interactive map display with dynamic vehicle visualization
-- Location search functionality to test any global location
-- Real-time metrics monitoring
-- Dynamic group formation visualization
-- Adjustable simulation parameters (scenario type, vehicle density)
+Then open your browser and navigate to `http://localhost:5001`
 
 ## 📁 Project Structure
 
@@ -213,6 +225,9 @@ This work is based on the research paper:
 - Department of Computer Science & Engineering, NSUT
 - OpenStreetMap contributors for map data
 
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 👥 Authors
 
