@@ -1,178 +1,236 @@
 # Adaptive Q-Learning VANET Routing with Dynamic Group Formation
 
-A comprehensive simulation platform for vehicular ad-hoc networks (VANETs) implementing adaptive Q-Learning routing algorithms with dynamic vehicle group formation capabilities.
+A sophisticated Vehicular Ad Hoc Network (VANET) simulation platform that implements adaptive Q-learning-based routing with dynamic group formation. This project demonstrates intelligent routing in vehicular networks using reinforcement learning and real-time clustering algorithms.
 
-<img width="856" alt="visualisation" src="https://github.com/user-attachments/assets/a22f06e9-254d-4685-85a8-4d4908f760ae" />
+## 🚀 Features
 
-## Features
+- **Dynamic RSU Clustering**: Real-time regrouping of Road Side Units (RSUs) using DBSCAN algorithm
+- **Adaptive Q-Learning**: Intelligent routing decisions using reinforcement learning
+- **Dual-head PPO Agent**: Simultaneous optimization of wireless hop selection and execution RSU choice
+- **Real-time Visualization**: Interactive web interface with live network topology display
+- **Multi-scenario Support**: Urban, highway, and suburban environment simulations
+- **Global Location Support**: Search and set any worldwide location as your simulation environment
+- **Performance Metrics**: 
+  - 27% lower end-to-end latency
+  - 32% less control-plane overhead  
+  - 4× reduction in edge-deadline misses
+  - Maintains >97% delivery ratio
 
-- **Multiple Simulation Environments**: Urban, highway, and suburban scenarios with different traffic patterns
-- **Dynamic Group Formation**: Autonomous formation of vehicle groups based on proximity and network conditions
-- **Adaptive Q-Learning Algorithm**: Reinforcement learning approach that optimizes routing decisions in real-time
-- **Interactive Visualization**: Real-time visualization of network topology and metrics
-- **Customizable Parameters**: Adjust vehicle density, location, and Q-Learning parameters
-- **Comprehensive API**: RESTful and WebSocket APIs for programmatic interaction
-- **Standalone Mode**: Run simulations without external dependencies
-- **Metrics Analysis**: Monitor link loss, centrality, and group stability in real-time
+## 📦 Technology Stack
 
-## Installation
+- **Backend**: Python 3.8+, Flask, Socket.IO
+- **Frontend**: HTML5, Bootstrap 5, JavaScript
+- **Maps & Visualization**: Leaflet.js for interactive maps with OpenStreetMap integration
+- **Location Services**: Nominatim API for geocoding
+- **Machine Learning**: scikit-learn (DBSCAN), PyTorch (PPO)
+- **Communication**: MQTT protocol for metrics collection
+- **Data Processing**: NumPy, pandas
+
+## 🛠️ Installation
 
 ### Prerequisites
 
 - Python 3.8 or higher
-- Flask and Flask-SocketIO
-- MQTT broker (optional, for distributed mode)
-- Modern web browser
+- pip package manager
+- MQTT broker (e.g., Mosquitto)
 
 ### Setup
 
 1. Clone the repository:
-   ```bash
-   git clone https://github.com/hridyeshh/Adaptive-Q-Learning-VANET-Routing-with-Dynamic-Group-Formation.git
-   cd Adaptive-Q-Learning-VANET-Routing-with-Dynamic-Group-Formation
-   ```
+```bash
+git clone https://github.com/yourusername/vanet-adaptive-routing.git
+cd vanet-adaptive-routing
+```
 
-2. Create and activate a virtual environment:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+2. Create a virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
 
 3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+```bash
+pip install -r requirements.txt
+```
 
-4. (Optional) Set up MQTT broker:
-   ```bash
-   # Install Mosquitto MQTT broker
-   # On Ubuntu/Debian:
-   sudo apt-get install mosquitto
-   # On macOS:
-   brew install mosquitto
-   # On Windows: Download from https://mosquitto.org/download/
-   ```
+4. Install and start MQTT broker:
+```bash
+# On Ubuntu/Debian
+sudo apt-get install mosquitto mosquitto-clients
+sudo systemctl start mosquitto
 
-## Usage
+# On macOS with Homebrew
+brew install mosquitto
+brew services start mosquitto
+```
 
-### Running the Simulation
+## 📖 Usage
 
-1. Start the server:
-   ```bash
-   python run.py
-   ```
+### Starting the Application
 
-2. Access the web interface:
-   - Open your browser and navigate to `http://localhost:5001`
-   - The main portal page will be displayed with options to launch different simulation modes
+1. Start the Flask web server:
+```bash
+cd src/python
+python app.py
+```
 
-3. Launch the simulation:
-   - Click on "Launch Simulation" from the portal
-   - Configure simulation parameters:
-     - Select scenario (urban, highway, suburban)
-     - Adjust vehicle density
-     - Set location (worldwide support)
-   - Click "Start Simulation" to begin
+2. Open your browser and navigate to:
+```
+http://localhost:5001
+```
 
-### Simulation Modes
+3. Configure simulation parameters:
+   - Select simulation scenario (Urban/Highway/Suburban)
+   - Set MQTT broker address and port
+   - Adjust vehicle density
+   - Click "Start Simulation"
 
-- **Full Mode**: Requires MQTT broker, provides distributed simulation capabilities
-- **Standalone Mode**: Self-contained simulation that runs entirely in the browser
+### Standalone Mode
 
-## Project Structure
+For testing without MQTT broker:
+```
+http://localhost:5001/standalone.html
+```
+
+The standalone mode offers the following capabilities:
+- Interactive map display with dynamic vehicle visualization
+- Location search functionality to test any global location
+- Real-time metrics monitoring
+- Dynamic group formation visualization
+- Adjustable simulation parameters (scenario type, vehicle density)
+
+## 📁 Project Structure
 
 ```
-.
-├── API.md                 # API documentation
-├── NETWORK_THEORY.md      # Theoretical background
-├── app.py                 # Flask application entry point
-├── run.py                 # Development server runner
+VANET/
 ├── src/
-│   ├── simulation/        # Simulation core logic
-│   │   ├── metrics_collector.py  # Collects network metrics
-│   │   └── dynamic_group.py      # Group formation algorithms
-│   └── web/               # Web interface
-│       ├── static/        # CSS, JS, and static assets
-│       └── templates/     # HTML templates
-│           ├── entry.html       # Portal landing page
-│           ├── simulation.html  # Main simulation interface
-│           ├── standalone.html  # Standalone simulation
-│           └── debug.html       # Debug interface
-├── data/                  # Dataset files
-└── uploads/               # User-uploaded files
+│   ├── python/
+│   │   ├── __init__.py
+│   │   ├── app.py              # Main Flask application
+│   │   ├── dynamic_group.py    # DBSCAN clustering implementation
+│   │   └── metrics_collector.py # MQTT metrics collection
+│   └── web/
+│       ├── static/
+│       │   ├── css/
+│       │   │   └── style.css
+│       │   └── js/
+│       │       └── main.js
+│       └── templates/
+│           ├── base.html
+│           ├── index.html
+│           ├── simulation.html
+│           └── standalone.html
+├── README.md
+└── requirements.txt
 ```
 
-## Technical Details
+## ⚙️ Configuration
 
-The simulation implements several key components:
+### MQTT Settings
 
-1. **Q-Learning Algorithm**: Model-free reinforcement learning that adapts to changing network conditions
-   ```
-   Q(s,a) = Q(s,a) + α[R + γ·max Q(s',a') - Q(s,a)]
-   ```
-   Where:
-   - α is the learning rate
-   - γ is the discount factor
-   - R is the reward
-   - s and a are the current state and action
-   - s' and a' are the next state and potential actions
+Configure MQTT broker connection in the web interface:
+- **Broker Address**: Default `localhost`
+- **Broker Port**: Default `1883`
 
-2. **Dynamic Group Formation**: Uses distance-based clustering to form vehicle groups with:
-   - Euclidean distance calculations
-   - Adaptive proximity thresholds
-   - Environment-specific parameters
+### Simulation Parameters
 
-3. **Network Metrics**: Tracks key performance indicators:
-   - Vehicle Density: Number of vehicles per unit area
-   - Link Loss Rate: Percentage of failed transmissions
-   - Degree Centrality: Connection count per node
-   - Group Stability: Duration of group configuration
+- **Scenario**: Urban, Highway, or Suburban
+- **Vehicle Density**: 5-50 vehicles per RSU
+- **Update Interval**: 30 seconds (configurable)
+- **Location**: Set any worldwide location for simulation
 
-## API Reference
+## 🔌 API Documentation
 
-The simulation provides a comprehensive RESTful API and WebSocket interface. For detailed documentation, see [API.md](API.md).
+The simulation provides a comprehensive RESTful API for programmatic control. Full API documentation is available in [API.md](API.md).
 
-### Key Endpoints
+### REST Endpoints
 
-```
-POST /api/simulation/start     # Start a new simulation
-POST /api/simulation/{id}/stop # Stop an active simulation
-GET  /api/simulation/{id}      # Get simulation status
-GET  /api/simulation/{id}/metrics # Get current metrics
-```
+- `POST /api/simulation/start`: Start a new simulation session
+  ```json
+  {
+    "scenario": "urban",      // Options: "urban", "highway", "suburban"
+    "density": 20,            // Range: 5-50 (vehicles)
+    "location": {
+      "lat": 28.6139, 
+      "lng": 77.2090,
+      "name": "Delhi, India"  // Optional
+    },
+    "duration": 3600          // Simulation duration in seconds (0 for indefinite)
+  }
+  ```
+
+- `POST /api/simulation/{simulationId}/stop`: Stop an active simulation
+- `GET /api/simulation/{simulationId}`: Retrieve current status
+- `GET /api/simulation/{simulationId}/vehicles`: Retrieve all vehicles
+- `GET /api/simulation/{simulationId}/groups`: Retrieve all vehicle groups
+- `GET /api/simulation/{simulationId}/metrics`: Retrieve current metrics
 
 ### WebSocket Events
 
-```
-vehicleUpdates  # Real-time vehicle position updates
-groupUpdates    # Group formation changes
-metricUpdates   # Performance metrics updates
-```
+- `metrics_update`: Real-time RSU metrics updates
+- `group_formation`: Dynamic group changes
+- `vehicleUpdates`: Real-time vehicle position updates
+- `groupUpdates`: Updates to group membership
+- `metricUpdates`: Regular performance metric updates
 
-## Contributing
+## 🧠 Network Theory Concepts
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+The project implements advanced network theory concepts described in detail in [NETWORK_THEORY.md](NETWORK_THEORY.md):
+
+### Communication Paradigms
+- V2V (Vehicle-to-Vehicle): Direct communication between vehicles
+- V2I (Vehicle-to-Infrastructure): Communication between vehicles and RSUs
+- V2X (Vehicle-to-Everything): Holistic communication encompassing all modalities
+
+### Q-Learning Implementation
+- States: Network conditions (density, link quality, congestion level)
+- Actions: Routing decisions (next hop selection, group formation)
+- Rewards: Successful packet delivery, reduced latency, network efficiency
+- Q-Value: Expected utility of taking a specific action in a specific state
+
+### Centrality Metrics
+- Degree Centrality: Number of direct connections a node maintains
+- Link Loss Rate: Inverse measure of connection reliability
+- Geographic Position: Spatial distribution within the network
+
+## 🤝 Contributing
 
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## License
+## 📚 Publication
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This work is based on the research paper:
+> "Adaptive HQGR-Plus: A Hierarchical Reinforcement Learning Framework for Compute-Aware VANET Routing with Dynamic Group Formation"
 
-## Contact
+## 🙏 Acknowledgments
 
-Hridyesh - [hridyesh2309@gmail.com](mailto:hridyesh2309@gmail.com)
+- Dr. Poonam Rani (Supervisor)
+- Ms. Monika Yadav (Co-supervisor)
+- Department of Computer Science & Engineering, NSUT
+- OpenStreetMap contributors for map data
 
-GitHub: [https://github.com/hridyeshh](https://github.com/hridyeshh)  
-LinkedIn: [https://www.linkedin.com/in/hridyeshh/](https://www.linkedin.com/in/hridyeshh/)  
-Twitter: [https://x.com/hridyeshhh](https://x.com/hridyeshhh)
+## 📝 License
 
-Project Link: [https://github.com/hridyeshh/Adaptive-Q-Learning-VANET-Routing-with-Dynamic-Group-Formation](https://github.com/hridyeshh/Adaptive-Q-Learning-VANET-Routing-with-Dynamic-Group-Formation)
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 👥 Authors
+
+- **Hridyesh Kumar** - 2021UCM2346
+- **Sumit Rawat** - 2021UCM2370  
+- **Mridul Singla** - 2021UCM2830
+
+Netaji Subhas University of Technology, Delhi
+
+## 📞 Contact
+
+For API support and questions, please contact:
+- Email: hridyesh2309@gmail.com
+- GitHub Issues: [Create an issue](https://github.com/hridyeshh/Adaptive-Q-Learning-VANET-Routing-with-Dynamic-Group-Formation/issues)
 
 ---
 
-*Last updated: May 18, 2025*
+⭐ Star this repository if you find it helpful!
