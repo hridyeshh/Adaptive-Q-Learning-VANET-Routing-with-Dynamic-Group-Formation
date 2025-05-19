@@ -213,24 +213,4 @@ The project implements advanced network theory concepts described in detail in [
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 📚 Publication
-
-This work is based on the research paper:
-> "Adaptive HQGR-Plus: A Hierarchical Reinforcement Learning Framework for Compute-Aware VANET Routing with Dynamic Group Formation"
-
-## 🙏 Acknowledgments
-
-- Dr. Poonam Rani (Supervisor)
-- Ms. Monika Yadav (Co-supervisor)
-- Department of Computer Science & Engineering, NSUT
-- OpenStreetMap contributors for map data
-
-
-## 👥 Authors
-
-- **Hridyesh Kumar** - 2021UCM2346
-- **Sumit Rawat** - 2021UCM2370  
-- **Mridul Singla** - 2021UCM2830
-
-Netaji Subhas University of Technology, Delhi
 
